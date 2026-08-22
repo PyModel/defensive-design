@@ -299,18 +299,31 @@ def _parse_retry_after(value: str | None, max_s: float) -> float | None:
     if not raw:
         return None
 
+    if raw.isascii() and raw.isdigit():
+        # `delay-seconds = 1*DIGIT`, ASCII only. int() alone is too permissive:
+        # it accepts "+12", "1_2", and non-ASCII digits.
+        #
+        # Bound the digit string before converting. float() of a long enough
+        # integer raises OverflowError, and int() itself refuses more than
+        # 4300 digits - either one would be an uncaught crash triggered by a
+        # header we do not control. Anything this long is certainly past the
+        # cap, so it resolves to the cap.
+        if len(raw) > 18:
+            return float(max_s)
+        return float(min(int(raw), max_s))
+
     try:
-        seconds: float = float(int(raw))
-    except ValueError:
-        try:
-            when = parsedate_to_datetime(raw)
-        except (TypeError, ValueError):
-            return None
-        if when is None:
-            return None
-        if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
+        when = parsedate_to_datetime(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    try:
         seconds = (when - datetime.now(timezone.utc)).total_seconds()
+    except (OverflowError, OSError):
+        return None
 
     if not math.isfinite(seconds) or seconds < 0:
         return None
