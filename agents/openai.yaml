@@ -1,0 +1,6 @@
+interface:
+  display_name: "Defensive Design"
+  short_description: "Production resilience and failure-mode design/review"
+  default_prompt: "Review or implement this production code defensively, using only proportional resilience mechanisms."
+policy:
+  allow_implicit_invocation: true
