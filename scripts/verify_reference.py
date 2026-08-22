@@ -78,7 +78,7 @@ async def test_5xx_opens_breaker_without_content_length_override():
     assert calls == 2, calls
     assert breaker.state is mod.CircuitState.OPEN
     assert breaker.failure_count == 2
-    assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+    assert result.status is mod.FetchStatus.OVERLOADED
     assert result.error_code == "CIRCUIT_OPEN"
 
 
@@ -133,6 +133,7 @@ async def test_operation_deadline_is_hard():
     result = await run_fetch(handler, config=cfg(deadline_s=0.05, per_attempt_timeout_s=1.0))
     elapsed = time.monotonic() - start
     assert elapsed < 0.15, elapsed
+    assert result.status is mod.FetchStatus.CANCELLED
     assert result.error_code == "DEADLINE_EXCEEDED"
 
 
@@ -148,6 +149,100 @@ async def test_half_open_4xx_resolves_probe():
     assert result.status is mod.FetchStatus.INVALID_REQUEST
     assert breaker.state is mod.CircuitState.CLOSED
     assert breaker.probing is False
+
+
+async def test_every_terminal_status_is_distinct():
+    """Outcomes with different default caller behavior must not share a status."""
+    cases = {
+        404: (mod.FetchStatus.NOT_FOUND, None),
+        401: (mod.FetchStatus.UNAUTHENTICATED, "UNAUTHENTICATED"),
+        403: (mod.FetchStatus.FORBIDDEN, "FORBIDDEN"),
+        429: (mod.FetchStatus.RATE_LIMITED, "RATE_LIMITED"),
+        400: (mod.FetchStatus.INVALID_REQUEST, "CLIENT_ERROR"),
+        302: (mod.FetchStatus.UNEXPECTED_RESPONSE, "UNEXPECTED_REDIRECT"),
+    }
+    for code, (want_status, want_code) in cases.items():
+        async def handler(request, _c=code):
+            return httpx.Response(_c)
+
+        result = await run_fetch(handler)
+        assert result.status is want_status, (code, result.status)
+        assert result.error_code == want_code, (code, result.error_code)
+
+
+async def test_408_is_retried_not_reported_as_invalid():
+    """RFC 9110 s15.5.9: the client MAY repeat a 408. It is not a permanent `invalid`."""
+    calls = 0
+
+    async def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(408)
+
+    result = await run_fetch(handler)
+    assert calls == 3, calls
+    assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+    assert result.error_code == "UPSTREAM_REQUEST_TIMEOUT"
+
+
+async def test_interleaved_4xx_does_not_reset_failure_count():
+    """A dependency alternating 5xx and 4xx must still trip the breaker."""
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=3, reset_timeout_s=30)
+    for _ in range(3):
+        await breaker.record_failure()
+        await breaker.record_reachable()
+    assert breaker.state is mod.CircuitState.OPEN, breaker.state
+    assert breaker.failure_count == 3, breaker.failure_count
+
+
+async def test_4xx_during_probe_still_closes_breaker():
+    """A response of any kind during HALF_OPEN proves recovery."""
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=1, reset_timeout_s=0.001)
+    await breaker.record_failure()
+    await asyncio.sleep(0.002)
+    assert await breaker.allow() is True
+    await breaker.record_reachable()
+    assert breaker.state is mod.CircuitState.CLOSED
+    assert breaker.failure_count == 0
+    assert breaker.probing is False
+
+
+async def test_abandoned_probe_is_reclaimed():
+    """A probe whose task died before releasing must not wedge the breaker."""
+    breaker = mod.AsyncCircuitBreaker(
+        failure_threshold=1, reset_timeout_s=30, probe_timeout_s=0.01
+    )
+    await breaker.record_failure()
+    breaker._opened_at = time.monotonic() - 60  # eligible for a probe
+    assert await breaker.allow() is True
+    assert breaker.probing is True
+
+    # Simulate cancellation between acquiring and releasing the probe.
+    assert await breaker.allow() is False, "a second concurrent probe must be refused"
+    await asyncio.sleep(0.012)
+    assert await breaker.allow() is True, "stale probe was never reclaimed"
+
+
+async def test_redirect_following_client_is_rejected():
+    """The 3xx branch is only meaningful if the client does not follow redirects."""
+    async def handler(request):
+        return httpx.Response(200, json={"display_name": "A", "email_domain": "e.com"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(
+        base_url="https://example.test", transport=transport, follow_redirects=True
+    ) as client:
+        try:
+            await mod.fetch_user_profile(
+                client,
+                mod.AsyncCircuitBreaker(),
+                user_id="abc",
+                request_id="req-1",
+                config=cfg(),
+            )
+        except ValueError:
+            return
+    raise AssertionError("expected ValueError for a redirect-following client")
 
 
 def test_config_rejects_pathological_values():
@@ -177,6 +272,12 @@ async def main():
         test_deep_json_is_typed_failure,
         test_operation_deadline_is_hard,
         test_half_open_4xx_resolves_probe,
+        test_every_terminal_status_is_distinct,
+        test_408_is_retried_not_reported_as_invalid,
+        test_interleaved_4xx_does_not_reset_failure_count,
+        test_4xx_during_probe_still_closes_breaker,
+        test_abandoned_probe_is_reclaimed,
+        test_redirect_following_client_is_rejected,
     ]
     for test in tests:
         await test()
