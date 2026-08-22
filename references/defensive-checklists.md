@@ -10,7 +10,7 @@ because ..." and dropped.
 
 - [ ] Does the operation have an overall deadline, set by the caller or inherited from one?
 - [ ] Is the remaining budget propagated to every downstream call, rather than each layer starting a fresh full-length timer?
-- [ ] Are connect, pool-acquisition, TLS handshake, read, and write bounded separately where the client supports it?
+- [ ] Are connect, pool-acquisition, TLS handshake, read, and write bounded separately where the client supports it, or is it documented why the client cannot split them? (httpx, for example, shares one value between TCP connect and the TLS handshake.)
 - [ ] Is the per-attempt timeout smaller than the overall deadline, so retries can actually occur?
 - [ ] Are streaming and long-poll reads bounded by an idle timeout, not only a total timeout?
 - [ ] Do background, cleanup, and shutdown paths have their own bounded deadline instead of blocking forever?
@@ -31,7 +31,8 @@ because ..." and dropped.
 ## Circuit Breakers and Load Shedding
 
 - [ ] Is there evidence that repeated failure would amplify load or exhaust a resource? If not, omit the breaker.
-- [ ] Which failures count toward opening: timeouts, 5xx, connection errors? Are 4xx excluded?
+- [ ] Which failures count toward opening: timeouts, 5xx, connection errors? Are 4xx excluded from counting *and* kept from resetting the counter? A client error that zeroes the failure count lets an alternating 5xx/4xx dependency hold the breaker closed forever.
+- [ ] Can a probe that is cancelled mid-flight leave the breaker half-open with no timer able to re-arm it?
 - [ ] What is the open duration, and what limits probe traffic in the half-open state?
 - [ ] What happens to callers while the breaker is open: error, fallback, or queue? Is that path bounded?
 - [ ] Is breaker state observable, and does it recover without manual intervention?
@@ -48,7 +49,7 @@ because ..." and dropped.
 - [ ] For effects in another system, is there an outbox, inbox, saga, provider idempotency key, or reconciliation job?
 - [ ] If an outbox is used, is the consumer also idempotent or backed by an inbox ledger? The relay can republish after a crash between publish and mark-published, so the producer-side fix alone is incomplete.
 - [ ] Does any claim of exactly-once name the exact durability and side-effect boundary it holds over, rather than implying it covers external effects such as email, payment, or object-store writes?
-- [ ] Is the guarantee stated accurately — usually at-least-once delivery with effect-once processing for a bounded window — rather than claimed as exactly-once?
+- [ ] Is the guarantee stated accurately — usually at-least-once delivery with atomicity only over the state the broker itself owns — rather than claimed as exactly-once?
 
 ## Ambiguous Outcomes and Partial Success
 

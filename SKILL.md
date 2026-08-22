@@ -27,7 +27,7 @@ Be pessimistic at boundaries and economical in implementation. Defensive complex
 6. **Untrusted context stays untrusted.** Validate user input, dependency output, retrieved content, model output, webhook payloads, and tool results before they affect state or privilege.
 7. **Repository evidence outranks generic advice.** Reuse existing contracts and cross-cutting infrastructure before creating new wrappers or frameworks.
 8. **Claims carry an evidence state.** Every verification or completion claim is labelled `verified` (actually executed or authoritative runtime output inspected), `reasoned_not_run` (follows from code inspection, not executed), `blocked` (appropriate but unavailable — no environment, credentials, or tooling), or `not_applicable`. Confidence is not evidence.
-9. **Recovery must not amplify failure.** Retries, replays, failover, cache rebuilds, backlog drains, compensations, and autoscaling all create work. Before adding one, answer: does this add load to an already-failing system, and what bounds it? Overload can sustain itself after its original trigger is gone.
+9. **Recovery must not amplify failure.** Retries, failover, cache rebuilds, autoscaling, and error-handling paths themselves all create work. Before adding one, answer: does this add load to an already-failing system, and what bounds it? Overload can sustain itself after its original trigger is gone.
 
 A quota, cache, fallback, or rate limiter is not automatically an availability control. Classify whether it protects security, abuse, cost, contractual limits, or integrity before deciding how it fails.
 
@@ -73,7 +73,7 @@ Trace input to final effect and identify:
 - Race windows, locks, leases, shared resources, and cancellation points.
 - Duplicate delivery, ambiguous write outcomes, restart points, and partial success.
 - Queues, pools, caches, fan-out, fallbacks, and work age.
-- Recovery mechanisms themselves: retries, replays, failover, cache rebuilds, backlog drains, autoscaling. Each is a load source during the incident it is meant to fix.
+- Recovery mechanisms themselves: retries, failover, cache rebuilds, autoscaling, and the error-handling path. Each is a load source during the incident it is meant to fix, and error handling is the one most often forgotten.
 
 Analyze failures that are severe, plausible, difficult to detect, or capable of violating an invariant. Do not enumerate every theoretical event.
 
@@ -125,7 +125,7 @@ If those answers are weak, omit or simplify it.
 - Bound task creation, queue depth *and queue age*, batches, payloads, result sets, retries, fan-out, recursion, memory, and connection use. Depth alone hides the case where nothing in the queue is still useful.
 - Preserve cancellation and structured cleanup. Do not swallow cancellation as ordinary failure.
 - Represent partial, degraded, stale, denied, and failed outcomes explicitly.
-- Log structured diagnostic data without secrets. Keep metric labels bounded — operation, dependency, status family, failure class, retryability. Tenant, user, idempotency key, raw URL, and prompt text belong in logs or traces under policy, never as metric dimensions. Audit privileged or irreversible effects where policy requires it.
+- Log structured diagnostic data without secrets. Keep metric labels bounded — operation, dependency, status family, failure class, retryability. The last two are house conventions with no OpenTelemetry counterpart; the stable spellings for HTTP are `http.request.method`, `http.response.status_code`, `server.address`, and `error.type`. Tenant, user, idempotency key, raw URL, and prompt text belong in logs or traces under policy, and become metric dimensions only as opt-in attributes, never on by default. Audit privileged or irreversible effects where policy requires it.
 - Reuse repository-native abstractions. Do not create a second resilience stack for one call site.
 
 When implementation is requested, provide complete in-scope code rather than placeholders. Do not weaken tests, broaden permissions, silently reduce scope, or claim production readiness for unverified behavior.
@@ -168,9 +168,9 @@ Verification depth scales with tier. Tier 0/1 is deterministic tests, malformed 
 - Define in-progress, completed, failed, expired, and abandoned states.
 - Retain deduplication state for the full duplicate-delivery or retry window.
 - For cross-system effects, use an outbox, inbox, saga, provider idempotency key, or reconciliation when one transaction is impossible.
-- An outbox closes the dual-write gap on the *producer* side only. The relay can still publish a record twice after a crash between publish and mark-published, so the consumer stays idempotent or keeps an inbox ledger. Outbox and inbox are a pair, not alternatives.
+- An outbox closes the dual-write gap on the *producer* side only. The relay can still publish a record twice after a crash between publish and mark-published, so the consumer stays idempotent or keeps a processed-message ledger (commonly called an inbox). The producer-side fix alone is incomplete.
 - Never write "exactly once" without naming the exact durability and side-effect boundary it holds over. Broker-level exactly-once processing does not make an email, payment, object-store write, or outbound HTTP call exactly once.
-- State the actual guarantee, usually at-least-once delivery with effect-once processing for a bounded window.
+- State the actual guarantee, usually at-least-once delivery with atomicity only over the state the broker itself owns.
 
 ### Concurrency and Capacity
 
@@ -268,6 +268,7 @@ Do not declare completion until the applicable statements are true:
 - Queue depth and queue age are bounded, and stale work is dropped rather than processed.
 - Leases that guard shared or external state are fenced, and the resource rejects stale generations.
 - Recovery paths — retry, replay, failover, rebuild, drain — are bounded and cannot amplify the failure they respond to.
+- Existing repository facilities for retries, timeouts, idempotency, and telemetry were reused rather than duplicated by a second resilience stack.
 - Failure-path checks ran against the final relevant code state.
 - Every completion claim carries an evidence state, and nothing unrun is reported as passing.
 

@@ -34,8 +34,9 @@ a repository-scoped `.agents/skills/` or your user-level skill directory.
   `invariant_violation` — each with a default behavior and a retry rule.
 - **Separates known failure from unknown outcome.** A timed-out read and a timed-out
   payment POST are not the same problem.
-- **Treats recovery as a load source.** Retries, replays, failover, cache rebuilds, and
-  backlog drains all create work during the incident they are meant to fix.
+- **Treats recovery as a load source.** Retries, failover, cache rebuilds, autoscaling,
+  and the error-handling path itself all create work during the incident they are
+  meant to fix.
 - **Labels every claim with an evidence state.** `verified`, `reasoned_not_run`,
   `blocked`, or `not_applicable`. Confidence is not evidence.
 
