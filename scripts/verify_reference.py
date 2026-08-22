@@ -279,6 +279,12 @@ def test_retry_after_parsing():
     # rejected outright
     for bad in (None, "", "   ", "not-a-number", "-5", "1.5", "NaN", "inf"):
         assert parse(bad, 60) is None, bad
+    # RFC 9110 delay-seconds is 1*DIGIT, ASCII. int() alone accepts all of these.
+    for bad in ("+12", "1_2", "\u0661\u0662", "12abc"):
+        assert parse(bad, 60) is None, bad
+    # A digit string long enough to overflow float() must clamp, not raise.
+    assert parse("9" * 400, 30) == 30.0
+    assert parse("9" * 100_000, 30) == 30.0
 
 
 async def test_retry_after_is_honored_over_jitter():
