@@ -65,9 +65,10 @@ python -m pip install httpx
 python scripts/verify_reference.py
 ```
 
-Nine deterministic checks cover path encoding, breaker transitions, bounded response
-reads, malformed `content-length`, deeply nested JSON, and hard deadline enforcement.
-CI runs them on Python 3.11, 3.12, and 3.13.
+Twenty deterministic checks cover path encoding, breaker transitions and probe
+recovery, bounded response reads, malformed `content-length`, deeply nested JSON,
+per-phase timeouts, bounded `Retry-After` handling, and hard deadline enforcement.
+CI runs them on Python 3.11 through 3.14.
 
 The reference is deliberately illustrative rather than a universal template. Reuse only
 the mechanisms justified by the current system's failure surface and existing platform

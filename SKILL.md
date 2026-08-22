@@ -40,9 +40,9 @@ Use the highest applicable tier:
 | 0: Local | Pure deterministic in-memory logic | Clear contract, precise errors, focused tests |
 | 1: Boundary | External read, parser, upload, cache, remote query | Tier 0 plus validation, limits, deadline, failure contract, safe logging |
 | 2: Stateful | Durable write, queue, webhook, concurrency, worker | Tier 1 plus idempotency, atomicity, race control, retry ownership, recovery tests |
-| 3: Critical | Auth, tenancy, privacy, billing, destructive or irreversible action | Tier 2 plus fail-closed behavior, auditability, reconciliation or rollback, strong negative and concurrency tests |
+| 3: Critical | Auth, tenancy, privacy, billing, destructive or irreversible action, or an agent tool that can reach any of those | Tier 2 plus fail-closed behavior, auditability, reconciliation or rollback, strong negative and concurrency tests |
 
-Tier follows consequence, not size. A five-line cross-tenant authorization check is Tier 3; a thousand-line deterministic formatter over trusted internal data stays Tier 0.
+Tier follows consequence, not size. A five-line cross-tenant authorization check is Tier 3; a thousand-line deterministic formatter over trusted internal data stays Tier 0. A tool exposed to an agent inherits the tier of the most damaging action it can perform, not the tier of its own code.
 
 Do not add retries, breakers, failover, or telemetry to a pure helper without a real failure surface.
 

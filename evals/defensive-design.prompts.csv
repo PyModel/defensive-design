@@ -20,3 +20,6 @@ test-18,true,"Checkout latency spiked an hour ago and has not recovered even tho
 test-19,false,"Add a docstring to this pure string-formatting helper."
 test-20,true,"We publish an order.confirmed event right after committing the order row. Make it reliable."
 test-21,false,"Convert this in-memory list comprehension to a generator expression."
+test-22,true,"Our Stripe webhook endpoint updates the order then returns 200. Make it production-ready."
+test-23,true,"Add a Redis cache in front of this per-user document lookup to cut latency."
+test-24,true,"Give our support agent a delete_account tool so it can close accounts when users ask."
