@@ -1,6 +1,10 @@
 ---
 name: defensive-design
 description: Use when designing, implementing, or reviewing code that crosses trust boundaries, calls external dependencies, mutates durable state, runs concurrently, handles untrusted input, or consumes finite resources. Applies to production-readiness, resilience, timeouts, retries, idempotency, backpressure, rate limiting, graceful degradation, failover, consistency, webhooks, queues, databases, caches, files, LLM or tool calls, happy-path-only drafts, and debugging a production incident or cascading failure. Skip for deterministic in-memory helpers with no meaningful external effects.
+license: MIT
+metadata:
+  author: PyModel
+  version: "1.0.0"
 ---
 
 # Defensive Design
