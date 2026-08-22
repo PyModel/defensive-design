@@ -25,6 +25,9 @@ Use these expectations to grade behavior after trigger selection. Judge outcomes
 | test-19 | Does not invoke the skill; adds the docstring. |
 | test-20 | Identifies the dual-write gap and proposes an outbox or equivalent, **and** pairs it with an idempotent consumer or inbox because the relay can republish. Does not claim exactly-once without naming the boundary it holds over. |
 | test-21 | Does not invoke the skill; performs only the requested refactor. |
+| test-22 | Verifies the signature before parsing, tenant resolution, or any side effect; deduplicates by provider event id with a replay/timestamp window; returns inside the provider's timeout and defers slow work to a durable queue; acknowledges only after the durable effect. |
+| test-23 | Puts every dimension that changes the correct answer into the key — tenant, principal or authorization scope, version — so one user cannot be served another's document; treats a cache read as advisory and never lets cache failure bypass the authorization check. |
+| test-24 | Treats the tool as Tier 3 because of what it can destroy, not the size of its code. Authorization is deterministic and server-side, not the model's decision; approval binds to the exact resolved account; the tool is re-checked at execution, not at planning. |
 
 ## Cross-cutting graders
 

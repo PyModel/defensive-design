@@ -21,6 +21,8 @@ import math
 import random
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from enum import Enum
 from typing import Generic, TypeVar
 from urllib.parse import quote
@@ -42,6 +44,15 @@ class ResilienceConfig:
     base_delay_s: float = 0.2
     max_delay_s: float = 2.0
     max_response_bytes: int = 1_000_000
+    # httpx applies a bare float to connect, read, write, and pool alike. These
+    # let the slow phases be bounded separately; None means "use the per-attempt
+    # value". httpx cannot split the TLS handshake from connect, so that clause
+    # of the checklist is not applicable here.
+    connect_timeout_s: float | None = None
+    pool_timeout_s: float | None = None
+    # A server may send an arbitrarily large or far-future Retry-After. Honor it
+    # only up to this bound so a hostile or broken value cannot stall the caller.
+    max_retry_after_s: float = 30.0
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -49,6 +60,9 @@ class ResilienceConfig:
             ("per_attempt_timeout_s", self.per_attempt_timeout_s),
             ("base_delay_s", self.base_delay_s),
             ("max_delay_s", self.max_delay_s),
+            ("max_retry_after_s", self.max_retry_after_s),
+            ("connect_timeout_s", self.effective_connect_timeout_s),
+            ("pool_timeout_s", self.effective_pool_timeout_s),
         ):
             if (
                 isinstance(value, bool)
@@ -73,6 +87,22 @@ class ResilienceConfig:
 
         if not isinstance(self.telemetry_key, bytes) or len(self.telemetry_key) < 16:
             raise ValueError("telemetry_key must be at least 16 bytes")
+
+    @property
+    def effective_connect_timeout_s(self) -> float:
+        return self.per_attempt_timeout_s if self.connect_timeout_s is None else self.connect_timeout_s
+
+    @property
+    def effective_pool_timeout_s(self) -> float:
+        return self.per_attempt_timeout_s if self.pool_timeout_s is None else self.pool_timeout_s
+
+    def attempt_timeout(self) -> httpx.Timeout:
+        """Bound each phase separately rather than reusing one value for all four."""
+        return httpx.Timeout(
+            self.per_attempt_timeout_s,
+            connect=self.effective_connect_timeout_s,
+            pool=self.effective_pool_timeout_s,
+        )
 
 
 class FetchStatus(Enum):
@@ -109,6 +139,7 @@ class FetchResult(Generic[T]):
     status: FetchStatus
     data: T | None = None
     error_code: str | None = None
+    retry_after_s: float | None = None
 
 
 class CircuitState(Enum):
@@ -254,6 +285,38 @@ def _validate_user_id(user_id: str) -> None:
         raise ValueError("user_id must not contain ASCII control characters")
 
 
+def _parse_retry_after(value: str | None, max_s: float) -> float | None:
+    """Parse a Retry-After header, bounded.
+
+    RFC 9110 s10.2.3 permits `delay-seconds` or an HTTP-date, and sets no upper
+    bound, so an HTTP-date can be arbitrarily far in the future. Anything
+    unparseable, negative, or non-finite is discarded rather than trusted; the
+    rest is clamped to `max_s`.
+    """
+    if value is None:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+
+    try:
+        seconds: float = float(int(raw))
+    except ValueError:
+        try:
+            when = parsedate_to_datetime(raw)
+        except (TypeError, ValueError):
+            return None
+        if when is None:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        seconds = (when - datetime.now(timezone.utc)).total_seconds()
+
+    if not math.isfinite(seconds) or seconds < 0:
+        return None
+    return min(seconds, max_s)
+
+
 def _parse_content_length(value: str | None) -> int | None:
     if value is None:
         return None
@@ -352,12 +415,13 @@ async def fetch_user_profile(
 
             probe_resolved = False
             retry_error_code: str | None = None
+            retry_after_hint: float | None = None
 
             try:
                 async with client.stream(
                     "GET",
                     f"/users/{safe_user_id}",
-                    timeout=config.per_attempt_timeout_s,
+                    timeout=config.attempt_timeout(),
                 ) as resp:
                     status = resp.status_code
 
@@ -371,6 +435,9 @@ async def fetch_user_profile(
                         await breaker.record_failure()
                         probe_resolved = True
                         retry_error_code = "UPSTREAM_5XX"
+                        retry_after_hint = _parse_retry_after(
+                            resp.headers.get("retry-after"), config.max_retry_after_s
+                        )
 
                     elif status == 200:
                         # The hypothetical API contract expects a JSON profile only on 200.
@@ -433,6 +500,9 @@ async def fetch_user_profile(
                         return FetchResult(
                             status=FetchStatus.RATE_LIMITED,
                             error_code="RATE_LIMITED",
+                            retry_after_s=_parse_retry_after(
+                                resp.headers.get("retry-after"), config.max_retry_after_s
+                            ),
                         )
 
                     elif status == 408:
@@ -445,6 +515,9 @@ async def fetch_user_profile(
                         await breaker.record_reachable()
                         probe_resolved = True
                         retry_error_code = "UPSTREAM_REQUEST_TIMEOUT"
+                        retry_after_hint = _parse_retry_after(
+                            resp.headers.get("retry-after"), config.max_retry_after_s
+                        )
 
                     elif 400 <= status < 500:
                         await breaker.record_reachable()
@@ -494,10 +567,16 @@ async def fetch_user_profile(
                 return FetchResult(
                     status=FetchStatus.TEMPORARILY_UNAVAILABLE,
                     error_code=retry_error_code,
+                    retry_after_s=retry_after_hint,
                 )
 
-            raw_delay = min(config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1)))
-            await asyncio.sleep(random.uniform(0.0, raw_delay))
+            if retry_after_hint is not None:
+                # A bounded server hint beats our own guess. The outer deadline
+                # still caps the total wait.
+                await asyncio.sleep(retry_after_hint)
+            else:
+                raw_delay = min(config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1)))
+                await asyncio.sleep(random.uniform(0.0, raw_delay))
 
         # Unreachable: every path above returns. Reaching here is an internal
         # invariant break, not a dependency problem.

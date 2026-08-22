@@ -9,6 +9,7 @@ import json
 import pathlib
 import sys
 import time
+from email.utils import formatdate
 
 import httpx
 
@@ -245,6 +246,71 @@ async def test_redirect_following_client_is_rejected():
     raise AssertionError("expected ValueError for a redirect-following client")
 
 
+async def test_429_surfaces_bounded_retry_after():
+    async def handler(request):
+        return httpx.Response(429, headers={"retry-after": "7"})
+
+    result = await run_fetch(handler)
+    assert result.status is mod.FetchStatus.RATE_LIMITED
+    assert result.retry_after_s == 7.0, result.retry_after_s
+
+
+async def test_hostile_retry_after_is_clamped():
+    """A server may send an arbitrarily large value; it must not stall the caller."""
+    async def handler(request):
+        return httpx.Response(429, headers={"retry-after": "99999999"})
+
+    result = await run_fetch(handler, config=cfg(max_retry_after_s=2.0))
+    assert result.retry_after_s == 2.0, result.retry_after_s
+
+
+def test_retry_after_parsing():
+    parse = mod._parse_retry_after
+    # delay-seconds
+    assert parse("12", 60) == 12.0
+    assert parse("  12  ", 60) == 12.0
+    # clamped
+    assert parse("900", 30) == 30.0
+    # HTTP-date, both directions
+    future = parse(formatdate(time.time() + 45, usegmt=True), 300)
+    assert future is not None and 30 < future < 60, future
+    past = parse(formatdate(time.time() - 500, usegmt=True), 300)
+    assert past is None, past
+    # rejected outright
+    for bad in (None, "", "   ", "not-a-number", "-5", "1.5", "NaN", "inf"):
+        assert parse(bad, 60) is None, bad
+
+
+async def test_retry_after_is_honored_over_jitter():
+    calls = 0
+
+    async def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, headers={"retry-after": "1"})
+
+    start = time.monotonic()
+    result = await run_fetch(
+        handler, config=cfg(deadline_s=0.30, max_retry_after_s=0.10)
+    )
+    elapsed = time.monotonic() - start
+    assert calls == 3, calls
+    assert result.retry_after_s == 0.10, result.retry_after_s
+    # Two sleeps of 0.10 between three attempts; jitter alone would be ~0.002.
+    assert elapsed >= 0.20, elapsed
+
+
+def test_attempt_timeout_bounds_each_phase_separately():
+    timeout = cfg(
+        per_attempt_timeout_s=5.0, connect_timeout_s=1.0, pool_timeout_s=0.5
+    ).attempt_timeout()
+    assert (timeout.connect, timeout.pool) == (1.0, 0.5)
+    assert (timeout.read, timeout.write) == (5.0, 5.0)
+    # Defaults fall back to the per-attempt value.
+    fallback = cfg(per_attempt_timeout_s=3.0).attempt_timeout()
+    assert (fallback.connect, fallback.read, fallback.write, fallback.pool) == (3.0,) * 4
+
+
 def test_config_rejects_pathological_values():
     bad = [
         {"deadline_s": float("nan")},
@@ -252,6 +318,9 @@ def test_config_rejects_pathological_values():
         {"max_attempts": 1.5},
         {"max_response_bytes": True},
         {"telemetry_key": b"short"},
+        {"max_retry_after_s": 0},
+        {"connect_timeout_s": -1.0},
+        {"pool_timeout_s": float("nan")},
     ]
     for override in bad:
         try:
@@ -263,6 +332,8 @@ def test_config_rejects_pathological_values():
 
 async def main():
     test_config_rejects_pathological_values()
+    test_retry_after_parsing()
+    test_attempt_timeout_bounds_each_phase_separately()
     tests = [
         test_success_and_path_encoding,
         test_5xx_opens_breaker_without_content_length_override,
@@ -278,11 +349,14 @@ async def main():
         test_4xx_during_probe_still_closes_breaker,
         test_abandoned_probe_is_reclaimed,
         test_redirect_following_client_is_rejected,
+        test_429_surfaces_bounded_retry_after,
+        test_hostile_retry_after_is_clamped,
+        test_retry_after_is_honored_over_jitter,
     ]
     for test in tests:
         await test()
         print(f"PASS {test.__name__}")
-    print(f"PASS {len(tests) + 1} checks total")
+    print(f"PASS {len(tests) + 3} checks total")
 
 
 if __name__ == "__main__":
