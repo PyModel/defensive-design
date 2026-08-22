@@ -76,15 +76,25 @@ class ResilienceConfig:
 
 
 class FetchStatus(Enum):
+    """Outcomes, one per failure class this operation can actually reach.
+
+    The trailing comment names the canonical class from
+    `references/failure-taxonomy.md`. Distinct classes carry distinct default
+    caller behavior, so they must not share a status value.
+    """
+
     SUCCESS = "success"
-    NOT_FOUND = "not_found"
-    INVALID_REQUEST = "invalid_request"
-    UNAUTHENTICATED = "unauthenticated"
-    FORBIDDEN = "forbidden"
-    RATE_LIMITED = "rate_limited"
-    INVALID_PAYLOAD = "invalid_payload"
-    UNEXPECTED_RESPONSE = "unexpected_response"
-    TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
+    NOT_FOUND = "not_found"                              # absence
+    INVALID_REQUEST = "invalid_request"                  # invalid
+    UNAUTHENTICATED = "unauthenticated"                  # unauthenticated
+    FORBIDDEN = "forbidden"                              # unauthorized
+    RATE_LIMITED = "rate_limited"                        # overloaded (caller quota)
+    INVALID_PAYLOAD = "invalid_payload"                  # invalid (dependency output)
+    UNEXPECTED_RESPONSE = "unexpected_response"          # permanent_dependency
+    TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"  # transient_dependency
+    OVERLOADED = "overloaded"                            # overloaded (shed by breaker)
+    CANCELLED = "cancelled"                              # cancelled (deadline expiry)
+    INTERNAL_ERROR = "internal_error"                    # invariant_violation
 
 
 @dataclass(frozen=True)
@@ -110,29 +120,55 @@ class CircuitState(Enum):
 class AsyncCircuitBreaker:
     """Single-event-loop task-safe breaker with one HALF_OPEN probe at a time.
 
+    Counting semantics are *consecutive*: `record_success` resets the counter,
+    `record_failure` increments it. `record_reachable` is deliberately neutral
+    while CLOSED, so an ordinary 4xx cannot erase a run of availability
+    failures - otherwise a dependency alternating 5xx and 4xx would hold the
+    breaker closed forever.
+
+    A HALF_OPEN probe carries its own deadline. If the probing task is
+    cancelled before it can release the probe, `allow` reclaims it once
+    `probe_timeout_s` has elapsed; without that the breaker would stay
+    HALF_OPEN with no timer able to re-arm it, and every later call would be
+    rejected with no recovery path.
+
     This is intentionally small and illustrative. Prefer a proven platform or
     client-library breaker when one already exists and satisfies the contract.
     """
 
-    def __init__(self, *, failure_threshold: int = 5, reset_timeout_s: float = 30.0) -> None:
+    def __init__(
+        self,
+        *,
+        failure_threshold: int = 5,
+        reset_timeout_s: float = 30.0,
+        probe_timeout_s: float | None = None,
+    ) -> None:
         if isinstance(failure_threshold, bool) or not isinstance(failure_threshold, int):
             raise ValueError("failure_threshold must be an integer")
         if failure_threshold < 1:
             raise ValueError("failure_threshold must be >= 1")
-        if (
-            isinstance(reset_timeout_s, bool)
-            or not isinstance(reset_timeout_s, (int, float))
-            or not math.isfinite(reset_timeout_s)
-            or reset_timeout_s <= 0
+        for name, value in (
+            ("reset_timeout_s", reset_timeout_s),
+            ("probe_timeout_s", reset_timeout_s if probe_timeout_s is None else probe_timeout_s),
         ):
-            raise ValueError("reset_timeout_s must be a finite, positive number")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ValueError(f"{name} must be a finite, positive number")
 
         self.failure_threshold = failure_threshold
         self.reset_timeout_s = float(reset_timeout_s)
+        self.probe_timeout_s = float(
+            reset_timeout_s if probe_timeout_s is None else probe_timeout_s
+        )
         self._failures = 0
         self._state = CircuitState.CLOSED
         self._opened_at = 0.0
         self._probing = False
+        self._probe_started_at = 0.0
         self._lock = asyncio.Lock()
 
     @property
@@ -155,21 +191,39 @@ class AsyncCircuitBreaker:
                     return False
                 self._state = CircuitState.HALF_OPEN
                 self._probing = True
+                self._probe_started_at = now
                 return True
 
             if self._state is CircuitState.HALF_OPEN:
-                if self._probing:
+                if self._probing and now - self._probe_started_at < self.probe_timeout_s:
                     return False
+                # Either no probe is outstanding, or the previous probe was
+                # abandoned (cancelled before release). Reclaim it.
                 self._probing = True
+                self._probe_started_at = now
                 return True
 
             return True
 
     async def record_success(self) -> None:
-        """Dependency answered with a contract-defined healthy/reachable outcome."""
+        """Dependency answered with a contract-defined healthy outcome."""
         async with self._lock:
             self._failures = 0
             self._state = CircuitState.CLOSED
+            self._probing = False
+
+    async def record_reachable(self) -> None:
+        """Dependency answered, but with a caller-side status (4xx).
+
+        Proof of reachability, not proof of health. While CLOSED this leaves the
+        failure count untouched so interleaved client errors cannot mask an
+        availability problem. During a HALF_OPEN probe a response of any kind
+        does demonstrate recovery, so the breaker closes.
+        """
+        async with self._lock:
+            if self._state is CircuitState.HALF_OPEN:
+                self._failures = 0
+                self._state = CircuitState.CLOSED
             self._probing = False
 
     async def record_failure(self) -> None:
@@ -259,7 +313,23 @@ async def fetch_user_profile(
     `request_id` is assumed to be an internal correlation identifier rather than
     user-provided content. If that is not true in the host application, sanitize
     or replace it before logging.
+
+    Preconditions on the injected `client`:
+
+    - It must not follow redirects. This function classifies 3xx explicitly; a
+      redirect-following client would instead chase up to `max_redirects` hops
+      off-host with no validation, and the 3xx branch would become dead code.
+    - It must not perform transport-level retries. This function owns the retry
+      loop, so a client built with `AsyncHTTPTransport(retries=N)` would
+      multiply attempts by N - the nested-retry amplification the checklist
+      warns about.
     """
+
+    if client.follow_redirects:
+        raise ValueError(
+            "client must be constructed with follow_redirects=False; "
+            "this function classifies 3xx responses itself"
+        )
 
     _validate_user_id(user_id)
     if not isinstance(request_id, str) or not (1 <= len(request_id) <= 128):
@@ -276,7 +346,7 @@ async def fetch_user_profile(
                     extra={"request_id": request_id, "subject": anon_id},
                 )
                 return FetchResult(
-                    status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+                    status=FetchStatus.OVERLOADED,
                     error_code="CIRCUIT_OPEN",
                 )
 
@@ -292,6 +362,11 @@ async def fetch_user_profile(
                     status = resp.status_code
 
                     # Availability failures are classified before any payload logic.
+                    # Note: 502 and 504 mean the origin may already have applied an
+                    # effect, so for a write they are `unknown_outcome`, not
+                    # `transient_dependency`. Retrying all 5xx is safe here only
+                    # because this request is a GET. Do not lift this status set
+                    # into a client that writes without an idempotency gate.
                     if 500 <= status < 600:
                         await breaker.record_failure()
                         probe_resolved = True
@@ -330,7 +405,7 @@ async def fetch_user_profile(
                         )
 
                     elif status == 401:
-                        await breaker.record_success()
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNAUTHENTICATED,
@@ -338,12 +413,12 @@ async def fetch_user_profile(
                         )
 
                     elif status == 403:
-                        await breaker.record_success()
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(status=FetchStatus.FORBIDDEN, error_code="FORBIDDEN")
 
                     elif status == 404:
-                        await breaker.record_success()
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(status=FetchStatus.NOT_FOUND)
 
@@ -351,15 +426,28 @@ async def fetch_user_profile(
                         # Contract assumption for this example: 429 is caller/quota throttling,
                         # not evidence that the dependency is unavailable. Change this policy if
                         # the real upstream uses 429 to signal service overload.
-                        await breaker.record_success()
+                        # No normative guidance exists here; Azure's breaker trips on 429 while
+                        # Polly excludes it by default, so this must follow the real contract.
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.RATE_LIMITED,
                             error_code="RATE_LIMITED",
                         )
 
+                    elif status == 408:
+                        # RFC 9110 s15.5.9: the origin "did not receive a complete
+                        # request message within the time that it was prepared to
+                        # wait... it MAY repeat that request." Transient, and the
+                        # request demonstrably never ran, so repeating is safe.
+                        # Breaker-neutral: this reflects request transmission, not
+                        # dependency health.
+                        await breaker.record_reachable()
+                        probe_resolved = True
+                        retry_error_code = "UPSTREAM_REQUEST_TIMEOUT"
+
                     elif 400 <= status < 500:
-                        await breaker.record_success()
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.INVALID_REQUEST,
@@ -367,7 +455,7 @@ async def fetch_user_profile(
                         )
 
                     else:
-                        await breaker.record_success()
+                        await breaker.record_reachable()
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
@@ -389,7 +477,7 @@ async def fetch_user_profile(
             if retry_error_code is None:
                 # Defensive invariant: all retry paths must state why they are retrying.
                 return FetchResult(
-                    status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+                    status=FetchStatus.INTERNAL_ERROR,
                     error_code="INTERNAL_RETRY_STATE_ERROR",
                 )
 
@@ -411,8 +499,10 @@ async def fetch_user_profile(
             raw_delay = min(config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1)))
             await asyncio.sleep(random.uniform(0.0, raw_delay))
 
+        # Unreachable: every path above returns. Reaching here is an internal
+        # invariant break, not a dependency problem.
         return FetchResult(
-            status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+            status=FetchStatus.INTERNAL_ERROR,
             error_code="UNKNOWN_FAILURE",
         )
 
@@ -422,6 +512,6 @@ async def fetch_user_profile(
     except TimeoutError:
         logger.warning("User fetch exceeded operation deadline", extra={"request_id": request_id})
         return FetchResult(
-            status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+            status=FetchStatus.CANCELLED,
             error_code="DEADLINE_EXCEEDED",
         )
