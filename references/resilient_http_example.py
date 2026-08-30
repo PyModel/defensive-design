@@ -3,11 +3,13 @@
 This example intentionally demonstrates only mechanisms that are relevant to a
 read-only HTTP lookup: strict configuration/input validation, a hard operation
 deadline, bounded/capped retry with full jitter, a small async circuit breaker,
-bounded response streaming, typed outcomes, URL path encoding, and redacted
-identifier logging.
+bounded response streaming, typed outcomes, contract-safe path segments, and redacted
+identifier logging by this module.
 
 It deliberately does not invent a metrics/tracing stack. Production callers
-should integrate with their existing telemetry system.
+should integrate with their existing telemetry system. HTTP client, proxy, and
+server access logs may record request paths; use non-sensitive opaque path identifiers
+or configure those separate logging boundaries to suppress or redact them.
 """
 
 from __future__ import annotations
@@ -20,24 +22,38 @@ import logging
 import math
 import random
 import time
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from enum import Enum
-from typing import Generic, TypeVar
-from urllib.parse import quote
+from typing import Generic, TypeGuard, TypeVar
 
 import httpx
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
+RETRYABLE_HTTP_STATUSES = frozenset({502, 503, 504})
+MAX_RETRY_ATTEMPTS = 10
+
+
+def _validate_positive_finite(name: str, value: object) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be a number")
+    try:
+        numeric = float(value)
+    except OverflowError:
+        raise ValueError(f"{name} must be a finite, positive number") from None
+    if not math.isfinite(numeric) or numeric <= 0:
+        raise ValueError(f"{name} must be a finite, positive number")
 
 
 @dataclass(frozen=True, kw_only=True)
 class ResilienceConfig:
     """Validated operational policy for the example client."""
 
-    telemetry_key: bytes
+    telemetry_key: bytes = field(repr=False)
+    expected_origin: str = field(repr=False)
     deadline_s: float = 5.0
     per_attempt_timeout_s: float = 2.0
     max_attempts: int = 3
@@ -50,8 +66,8 @@ class ResilienceConfig:
     # of the checklist is not applicable here.
     connect_timeout_s: float | None = None
     pool_timeout_s: float | None = None
-    # A server may send an arbitrarily large or far-future Retry-After. Honor it
-    # only up to this bound so a hostile or broken value cannot stall the caller.
+    # A server may send an arbitrarily large or far-future Retry-After. Reject
+    # automatic retry above this bound; never shorten the server's minimum.
     max_retry_after_s: float = 30.0
 
     def __post_init__(self) -> None:
@@ -64,21 +80,19 @@ class ResilienceConfig:
             ("connect_timeout_s", self.effective_connect_timeout_s),
             ("pool_timeout_s", self.effective_pool_timeout_s),
         ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                or value <= 0
-            ):
-                raise ValueError(f"{name} must be a finite, positive number")
+            _validate_positive_finite(name, value)
 
-        if isinstance(self.max_attempts, bool) or not isinstance(self.max_attempts, int):
-            raise ValueError("max_attempts must be an integer")
-        if self.max_attempts < 1:
-            raise ValueError("max_attempts must be >= 1")
+        if isinstance(self.max_attempts, bool) or not isinstance(
+            self.max_attempts, int
+        ):
+            raise TypeError("max_attempts must be an integer")
+        if not 1 <= self.max_attempts <= MAX_RETRY_ATTEMPTS:
+            raise ValueError(f"max_attempts must be between 1 and {MAX_RETRY_ATTEMPTS}")
 
-        if isinstance(self.max_response_bytes, bool) or not isinstance(self.max_response_bytes, int):
-            raise ValueError("max_response_bytes must be an integer")
+        if isinstance(self.max_response_bytes, bool) or not isinstance(
+            self.max_response_bytes, int
+        ):
+            raise TypeError("max_response_bytes must be an integer")
         if self.max_response_bytes < 1:
             raise ValueError("max_response_bytes must be >= 1")
 
@@ -88,13 +102,36 @@ class ResilienceConfig:
         if not isinstance(self.telemetry_key, bytes) or len(self.telemetry_key) < 16:
             raise ValueError("telemetry_key must be at least 16 bytes")
 
+        try:
+            origin = httpx.URL(self.expected_origin)
+        except (TypeError, httpx.InvalidURL):
+            raise ValueError("expected_origin must be a valid HTTPS origin") from None
+        if (
+            origin.scheme != "https"
+            or not origin.host
+            or origin.username
+            or origin.password
+            or origin.path != "/"
+            or origin.query
+            or origin.fragment
+        ):
+            raise ValueError("expected_origin must be a credential-free HTTPS origin")
+
     @property
     def effective_connect_timeout_s(self) -> float:
-        return self.per_attempt_timeout_s if self.connect_timeout_s is None else self.connect_timeout_s
+        return (
+            self.per_attempt_timeout_s
+            if self.connect_timeout_s is None
+            else self.connect_timeout_s
+        )
 
     @property
     def effective_pool_timeout_s(self) -> float:
-        return self.per_attempt_timeout_s if self.pool_timeout_s is None else self.pool_timeout_s
+        return (
+            self.per_attempt_timeout_s
+            if self.pool_timeout_s is None
+            else self.pool_timeout_s
+        )
 
     def attempt_timeout(self) -> httpx.Timeout:
         """Bound each phase separately rather than reusing one value for all four."""
@@ -106,32 +143,38 @@ class ResilienceConfig:
 
 
 class FetchStatus(Enum):
-    """Outcomes, one per failure class this operation can actually reach.
+    """Caller-visible results this operation can actually reach.
 
-    The trailing comment names the canonical class from
-    `references/failure-taxonomy.md`. Distinct classes carry distinct default
-    caller behavior, so they must not share a status value.
+    The trailing comment names the relevant result or cause label from
+    `references/failure-taxonomy.md`. Results with different caller behavior
+    must not share a status value.
     """
 
     SUCCESS = "success"
-    NOT_FOUND = "not_found"                              # absence
-    INVALID_REQUEST = "invalid_request"                  # invalid
-    UNAUTHENTICATED = "unauthenticated"                  # unauthenticated
-    FORBIDDEN = "forbidden"                              # unauthorized
-    RATE_LIMITED = "rate_limited"                        # overloaded (caller quota)
-    INVALID_PAYLOAD = "invalid_payload"                  # invalid (dependency output)
-    UNEXPECTED_RESPONSE = "unexpected_response"          # permanent_dependency
+    NOT_FOUND = "not_found"  # absence
+    INVALID_REQUEST = "invalid_request"  # invalid
+    UNAUTHENTICATED = "unauthenticated"  # unauthenticated
+    FORBIDDEN = "forbidden"  # unauthorized
+    RATE_LIMITED = "rate_limited"  # policy_limit (caller quota)
+    INVALID_PAYLOAD = "invalid_payload"  # invalid (dependency output)
+    UNEXPECTED_RESPONSE = "unexpected_response"  # permanent_dependency
     TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"  # transient_dependency
-    OVERLOADED = "overloaded"                            # overloaded (shed by breaker)
-    CANCELLED = "cancelled"                              # cancelled (deadline expiry)
-    INTERNAL_ERROR = "internal_error"                    # invariant_violation
+    OVERLOADED = "overloaded"  # overloaded (local pool saturation)
+    CANCELLED = "cancelled"  # cancelled (deadline expiry)
+    INTERNAL_ERROR = "internal_error"  # invariant_violation
+
+
+@dataclass(frozen=True)
+class _RetryAfterHint:
+    delay_s: float | None = None
+    exceeds_limit: bool = False
 
 
 @dataclass(frozen=True)
 class UserProfile:
     user_id: str
     display_name: str
-    email_domain: str
+    email_domain: str | None
 
 
 @dataclass(frozen=True)
@@ -149,19 +192,19 @@ class CircuitState(Enum):
 
 
 class AsyncCircuitBreaker:
-    """Single-event-loop task-safe breaker with one HALF_OPEN probe at a time.
+    """Single-event-loop task-safe breaker with a fenced HALF_OPEN probe.
 
     Counting semantics are *consecutive*: `record_success` resets the counter,
-    `record_failure` increments it. `record_reachable` is deliberately neutral
-    while CLOSED, so an ordinary 4xx cannot erase a run of availability
-    failures - otherwise a dependency alternating 5xx and 4xx would hold the
-    breaker closed forever.
+    `record_failure` increments it, and `record_reachable` is deliberately
+    neutral while CLOSED. The caller classifies outcomes from its dependency
+    contract: valid absence or policy denial can be healthy; status families
+    alone do not decide breaker behavior.
 
-    A HALF_OPEN probe carries its own deadline. If the probing task is
-    cancelled before it can release the probe, `allow` reclaims it once
-    `probe_timeout_s` has elapsed; without that the breaker would stay
-    HALF_OPEN with no timer able to re-arm it, and every later call would be
-    rejected with no recovery path.
+    Every allowed call receives a generation permit. Opening or resolving the
+    breaker advances the generation, so a late result cannot mutate newer
+    state. Time alone never creates an overlapping probe; an unresolved probe
+    must be released in `finally`, which reopens the breaker for another bounded
+    cooldown.
 
     This is intentionally small and illustrative. Prefer a proven platform or
     client-library breaker when one already exists and satisfies the contract.
@@ -172,34 +215,26 @@ class AsyncCircuitBreaker:
         *,
         failure_threshold: int = 5,
         reset_timeout_s: float = 30.0,
-        probe_timeout_s: float | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        if isinstance(failure_threshold, bool) or not isinstance(failure_threshold, int):
-            raise ValueError("failure_threshold must be an integer")
+        if isinstance(failure_threshold, bool) or not isinstance(
+            failure_threshold, int
+        ):
+            raise TypeError("failure_threshold must be an integer")
         if failure_threshold < 1:
             raise ValueError("failure_threshold must be >= 1")
-        for name, value in (
-            ("reset_timeout_s", reset_timeout_s),
-            ("probe_timeout_s", reset_timeout_s if probe_timeout_s is None else probe_timeout_s),
-        ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                or value <= 0
-            ):
-                raise ValueError(f"{name} must be a finite, positive number")
+        _validate_positive_finite("reset_timeout_s", reset_timeout_s)
+        if not callable(clock):
+            raise TypeError("clock must be callable")
 
         self.failure_threshold = failure_threshold
         self.reset_timeout_s = float(reset_timeout_s)
-        self.probe_timeout_s = float(
-            reset_timeout_s if probe_timeout_s is None else probe_timeout_s
-        )
+        self._clock = clock
         self._failures = 0
         self._state = CircuitState.CLOSED
         self._opened_at = 0.0
         self._probing = False
-        self._probe_started_at = 0.0
+        self._generation = 1
         self._lock = asyncio.Lock()
 
     @property
@@ -214,64 +249,71 @@ class AsyncCircuitBreaker:
     def probing(self) -> bool:
         return self._probing
 
-    async def allow(self) -> bool:
+    async def allow(self) -> int | None:
         async with self._lock:
-            now = time.monotonic()
+            now = self._clock()
             if self._state is CircuitState.OPEN:
                 if now - self._opened_at < self.reset_timeout_s:
-                    return False
+                    return None
                 self._state = CircuitState.HALF_OPEN
                 self._probing = True
-                self._probe_started_at = now
-                return True
+                self._generation += 1
+                return self._generation
 
             if self._state is CircuitState.HALF_OPEN:
-                if self._probing and now - self._probe_started_at < self.probe_timeout_s:
-                    return False
-                # Either no probe is outstanding, or the previous probe was
-                # abandoned (cancelled before release). Reclaim it.
-                self._probing = True
-                self._probe_started_at = now
-                return True
+                return None
 
-            return True
+            return self._generation
 
-    async def record_success(self) -> None:
+    async def record_success(self, permit: int) -> None:
         """Dependency answered with a contract-defined healthy outcome."""
         async with self._lock:
+            if permit != self._generation:
+                return
             self._failures = 0
-            self._state = CircuitState.CLOSED
-            self._probing = False
+            if self._state is CircuitState.HALF_OPEN:
+                self._state = CircuitState.CLOSED
+                self._probing = False
+                self._generation += 1
 
-    async def record_reachable(self) -> None:
-        """Dependency answered, but with a caller-side status (4xx).
+    async def record_reachable(self, permit: int) -> None:
+        """Dependency answered with a contract-defined breaker-neutral result.
 
-        Proof of reachability, not proof of health. While CLOSED this leaves the
-        failure count untouched so interleaved client errors cannot mask an
-        availability problem. During a HALF_OPEN probe a response of any kind
-        does demonstrate recovery, so the breaker closes.
+        While CLOSED this leaves the failure count untouched. During the active
+        HALF_OPEN probe, any response proves reachability and closes the breaker.
         """
         async with self._lock:
+            if permit != self._generation:
+                return
             if self._state is CircuitState.HALF_OPEN:
                 self._failures = 0
                 self._state = CircuitState.CLOSED
-            self._probing = False
+                self._probing = False
+                self._generation += 1
 
-    async def record_failure(self) -> None:
-        """Dependency had a transport/timeout/5xx availability failure."""
+    async def record_failure(self, permit: int) -> None:
+        """Dependency had a contract-defined transient availability failure."""
         async with self._lock:
+            if permit != self._generation:
+                return
             was_half_open = self._state is CircuitState.HALF_OPEN
+            if self._state not in {CircuitState.CLOSED, CircuitState.HALF_OPEN}:
+                return
             self._failures += 1
-            self._probing = False
             if self._failures >= self.failure_threshold or was_half_open:
                 self._state = CircuitState.OPEN
-                self._opened_at = time.monotonic()
-
-    async def release_probe(self) -> None:
-        """Release an unresolved HALF_OPEN probe after cancellation/unexpected exit."""
-        async with self._lock:
-            if self._state is CircuitState.HALF_OPEN:
+                self._opened_at = self._clock()
                 self._probing = False
+                self._generation += 1
+
+    async def release_probe(self, permit: int) -> None:
+        """Fence an unresolved probe and restart the open cooldown."""
+        async with self._lock:
+            if permit == self._generation and self._state is CircuitState.HALF_OPEN:
+                self._state = CircuitState.OPEN
+                self._opened_at = self._clock()
+                self._probing = False
+                self._generation += 1
 
 
 def pseudonymize(identifier: str, key: bytes) -> str:
@@ -281,23 +323,38 @@ def pseudonymize(identifier: str, key: bytes) -> str:
 def _validate_user_id(user_id: str) -> None:
     if not isinstance(user_id, str) or not (1 <= len(user_id) <= 128):
         raise ValueError("user_id must be a string between 1 and 128 characters")
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in user_id):
-        raise ValueError("user_id must not contain ASCII control characters")
+    if user_id in {".", ".."}:
+        raise ValueError("user_id must not be a dot path segment")
+    if not all(ch.isascii() and (ch.isalnum() or ch in "-._~") for ch in user_id):
+        raise ValueError("user_id must contain only ASCII unreserved path characters")
 
 
-def _parse_retry_after(value: str | None, max_s: float) -> float | None:
-    """Parse a Retry-After header, bounded.
+def _validate_request_id(request_id: str) -> None:
+    if not isinstance(request_id, str) or not (1 <= len(request_id) <= 128):
+        raise ValueError("request_id must be a string between 1 and 128 characters")
+    if not all(ch.isascii() and (ch.isalnum() or ch in "-._:") for ch in request_id):
+        raise ValueError("request_id must be an opaque ASCII correlation identifier")
+
+
+def _parse_retry_after(
+    value: str | None,
+    max_s: float,
+    *,
+    now: datetime | None = None,
+) -> _RetryAfterHint:
+    """Parse a Retry-After header without shortening the server's minimum.
 
     RFC 9110 s10.2.3 permits `delay-seconds` or an HTTP-date, and sets no upper
-    bound, so an HTTP-date can be arbitrarily far in the future. Anything
-    unparseable, negative, or non-finite is discarded rather than trusted; the
-    rest is clamped to `max_s`.
+    bound, so an HTTP-date can be arbitrarily far in the future. Unparseable,
+    negative, or non-finite input is discarded. A valid minimum
+    above `max_s` is marked unusable so the caller stops automatic retries
+    instead of retrying earlier than the server allowed.
     """
     if value is None:
-        return None
+        return _RetryAfterHint()
     raw = value.strip()
     if not raw:
-        return None
+        return _RetryAfterHint()
 
     if raw.isascii() and raw.isdigit():
         # `delay-seconds = 1*DIGIT`, ASCII only. int() alone is too permissive:
@@ -307,27 +364,33 @@ def _parse_retry_after(value: str | None, max_s: float) -> float | None:
         # integer raises OverflowError, and int() itself refuses more than
         # 4300 digits - either one would be an uncaught crash triggered by a
         # header we do not control. Anything this long is certainly past the
-        # cap, so it resolves to the cap.
+        # limit, so it is rejected without constructing an enormous integer.
         if len(raw) > 18:
-            return float(max_s)
-        return float(min(int(raw), max_s))
+            return _RetryAfterHint(exceeds_limit=True)
+        seconds = float(int(raw))
+        if seconds > max_s:
+            return _RetryAfterHint(exceeds_limit=True)
+        return _RetryAfterHint(delay_s=seconds)
 
     try:
         when = parsedate_to_datetime(raw)
     except (TypeError, ValueError, OverflowError):
-        return None
+        return _RetryAfterHint()
     if when is None:
-        return None
+        return _RetryAfterHint()
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
     try:
-        seconds = (when - datetime.now(timezone.utc)).total_seconds()
-    except (OverflowError, OSError):
-        return None
+        current = datetime.now(timezone.utc) if now is None else now
+        seconds = (when - current).total_seconds()
+    except (OverflowError, OSError, TypeError):
+        return _RetryAfterHint()
 
     if not math.isfinite(seconds) or seconds < 0:
-        return None
-    return min(seconds, max_s)
+        return _RetryAfterHint()
+    if seconds > max_s:
+        return _RetryAfterHint(exceeds_limit=True)
+    return _RetryAfterHint(delay_s=seconds)
 
 
 def _parse_content_length(value: str | None) -> int | None:
@@ -345,34 +408,103 @@ async def _read_bounded_body(resp: httpx.Response, max_bytes: int) -> bytes | No
     if declared is not None and declared > max_bytes:
         return None
 
+    if resp.is_stream_consumed:
+        return resp.content if len(resp.content) <= max_bytes else None
+
     body = bytearray()
-    async for chunk in resp.aiter_bytes():
+    async for chunk in resp.aiter_raw():
         if len(body) + len(chunk) > max_bytes:
             return None
         body.extend(chunk)
     return bytes(body)
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError("non-finite JSON constants are not allowed")
+
+
+def _object_without_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON keys are not allowed")
+        result[key] = value
+    return result
+
+
+def _is_safe_text(value: object, max_chars: int) -> TypeGuard[str]:
+    if not isinstance(value, str) or not (1 <= len(value) <= max_chars):
+        return False
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _canonicalize_domain(value: object) -> str | None:
+    if not _is_safe_text(value, 253):
+        return None
+    # This dependency-free example intentionally accepts only the DNS LDH subset.
+    # Unicode domains require one reviewed IDNA2008/UTS #46 canonicalizer shared by
+    # every policy, cache, resolver, and transport boundary; stdlib IDNA2003 can
+    # otherwise collapse distinct names such as `faß.de` and `fass.de`.
+    if not value.isascii():
+        return None
+    ascii_domain = value.lower()
+    if len(ascii_domain) > 253:
+        return None
+    labels = ascii_domain.split(".")
+    if not all(
+        1 <= len(label) <= 63
+        and not label.startswith("-")
+        and not label.endswith("-")
+        and all(ch.isascii() and (ch.isalnum() or ch == "-") for ch in label)
+        for label in labels
+    ):
+        return None
+    return ascii_domain
+
+
 def _parse_profile(body: bytes, user_id: str) -> FetchResult[UserProfile]:
     try:
-        payload = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
-        return FetchResult(status=FetchStatus.INVALID_PAYLOAD, error_code="MALFORMED_JSON")
+        payload = json.loads(
+            body.decode("utf-8"),
+            parse_constant=_reject_json_constant,
+            object_pairs_hook=_object_without_duplicates,
+        )
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="MALFORMED_JSON"
+        )
 
     if not isinstance(payload, dict):
-        return FetchResult(status=FetchStatus.INVALID_PAYLOAD, error_code="SCHEMA_VIOLATION")
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="SCHEMA_VIOLATION"
+        )
 
     display_name = payload.get("display_name")
-    email_domain = payload.get("email_domain", "unknown")
+    raw_email_domain = payload.get("email_domain")
+    email_domain = (
+        None if raw_email_domain is None else _canonicalize_domain(raw_email_domain)
+    )
 
-    if not isinstance(display_name, str) or not (1 <= len(display_name) <= 100):
-        return FetchResult(status=FetchStatus.INVALID_PAYLOAD, error_code="INVALID_DISPLAY_NAME")
-    if not isinstance(email_domain, str) or not (1 <= len(email_domain) <= 100):
-        return FetchResult(status=FetchStatus.INVALID_PAYLOAD, error_code="INVALID_EMAIL_DOMAIN")
+    if not _is_safe_text(display_name, 100):
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="INVALID_DISPLAY_NAME"
+        )
+    if raw_email_domain is not None and email_domain is None:
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="INVALID_EMAIL_DOMAIN"
+        )
 
     return FetchResult(
         status=FetchStatus.SUCCESS,
-        data=UserProfile(user_id=user_id, display_name=display_name, email_domain=email_domain),
+        data=UserProfile(
+            user_id=user_id, display_name=display_name, email_domain=email_domain
+        ),
     )
 
 
@@ -390,11 +522,22 @@ async def fetch_user_profile(
     user-provided content. If that is not true in the host application, sanitize
     or replace it before logging.
 
+    `user_id` appears in the request path. It must be non-sensitive and opaque when
+    HTTP client, proxy, or server access logs can record paths; this module controls
+    only its own logger.
+
     Preconditions on the injected `client`:
 
+    - Its base URL must exactly match the fixed HTTPS origin in `config`. The
+      host application remains responsible for TLS verification and trusted
+      proxy/resolver configuration because HTTPX does not expose those policies
+      for reliable introspection after client construction.
     - It must not follow redirects. This function classifies 3xx explicitly; a
       redirect-following client would instead chase up to `max_redirects` hops
       off-host with no validation, and the 3xx branch would become dead code.
+    - It must not configure request or response event hooks. Such hooks can mutate
+      the validated URL or headers, pre-decode the body, or strip response metadata
+      before this function enforces its boundaries.
     - It must not perform transport-level retries. This function owns the retry
       loop, so a client built with `AsyncHTTPTransport(retries=N)` would
       multiply attempts by N - the nested-retry amplification the checklist
@@ -406,23 +549,26 @@ async def fetch_user_profile(
             "client must be constructed with follow_redirects=False; "
             "this function classifies 3xx responses itself"
         )
+    if any(client.event_hooks.values()):
+        raise ValueError("client must not configure request or response event hooks")
+    if client.base_url != httpx.URL(config.expected_origin):
+        raise ValueError("client base_url must match config.expected_origin exactly")
 
     _validate_user_id(user_id)
-    if not isinstance(request_id, str) or not (1 <= len(request_id) <= 128):
-        raise ValueError("request_id must be a string between 1 and 128 characters")
+    _validate_request_id(request_id)
 
     async def run() -> FetchResult[UserProfile]:
-        safe_user_id = quote(user_id, safe="")
         anon_id = pseudonymize(user_id, config.telemetry_key)
 
         for attempt in range(1, config.max_attempts + 1):
-            if not await breaker.allow():
+            permit = await breaker.allow()
+            if permit is None:
                 logger.warning(
                     "Circuit breaker rejected outbound user fetch",
                     extra={"request_id": request_id, "subject": anon_id},
                 )
                 return FetchResult(
-                    status=FetchStatus.OVERLOADED,
+                    status=FetchStatus.TEMPORARILY_UNAVAILABLE,
                     error_code="CIRCUIT_OPEN",
                 )
 
@@ -433,30 +579,54 @@ async def fetch_user_profile(
             try:
                 async with client.stream(
                     "GET",
-                    f"/users/{safe_user_id}",
+                    f"/users/{user_id}",
+                    headers={"Accept-Encoding": "identity"},
                     timeout=config.attempt_timeout(),
                 ) as resp:
                     status = resp.status_code
 
-                    # Availability failures are classified before any payload logic.
-                    # Note: 502 and 504 mean the origin may already have applied an
-                    # effect, so for a write they are `unknown_outcome`, not
-                    # `transient_dependency`. Retrying all 5xx is safe here only
-                    # because this request is a GET. Do not lift this status set
-                    # into a client that writes without an idempotency gate.
-                    if 500 <= status < 600:
-                        await breaker.record_failure()
+                    # This hypothetical dependency contract marks only these
+                    # statuses transient. Do not generalize the allowlist: even an
+                    # idempotent method should retry only failures expected to
+                    # change inside the remaining deadline.
+                    if status in RETRYABLE_HTTP_STATUSES:
+                        await breaker.record_failure(permit)
                         probe_resolved = True
-                        retry_error_code = "UPSTREAM_5XX"
-                        retry_after_hint = _parse_retry_after(
+                        retry_error_code = "UPSTREAM_TRANSIENT_5XX"
+                        hint = _parse_retry_after(
                             resp.headers.get("retry-after"), config.max_retry_after_s
+                        )
+                        if hint.exceeds_limit:
+                            return FetchResult(
+                                status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+                                error_code="RETRY_AFTER_EXCEEDS_BUDGET",
+                            )
+                        retry_after_hint = hint.delay_s
+
+                    elif 500 <= status < 600:
+                        await breaker.record_reachable(permit)
+                        probe_resolved = True
+                        return FetchResult(
+                            status=FetchStatus.UNEXPECTED_RESPONSE,
+                            error_code="UPSTREAM_PERMANENT_5XX",
                         )
 
                     elif status == 200:
                         # The hypothetical API contract expects a JSON profile only on 200.
+                        content_encoding = resp.headers.get("content-encoding")
+                        if (
+                            content_encoding is not None
+                            and content_encoding.strip().lower() != "identity"
+                        ):
+                            await breaker.record_reachable(permit)
+                            probe_resolved = True
+                            return FetchResult(
+                                status=FetchStatus.INVALID_PAYLOAD,
+                                error_code="UNSUPPORTED_CONTENT_ENCODING",
+                            )
                         body = await _read_bounded_body(resp, config.max_response_bytes)
                         if body is None:
-                            await breaker.record_success()
+                            await breaker.record_success(permit)
                             probe_resolved = True
                             return FetchResult(
                                 status=FetchStatus.INVALID_PAYLOAD,
@@ -464,12 +634,12 @@ async def fetch_user_profile(
                             )
 
                         result = _parse_profile(body, user_id)
-                        await breaker.record_success()
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return result
 
                     elif 201 <= status < 300:
-                        await breaker.record_success()
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
@@ -477,7 +647,7 @@ async def fetch_user_profile(
                         )
 
                     elif 300 <= status < 400:
-                        await breaker.record_success()
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
@@ -485,7 +655,7 @@ async def fetch_user_profile(
                         )
 
                     elif status == 401:
-                        await breaker.record_reachable()
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNAUTHENTICATED,
@@ -493,72 +663,109 @@ async def fetch_user_profile(
                         )
 
                     elif status == 403:
-                        await breaker.record_reachable()
+                        await breaker.record_success(permit)
                         probe_resolved = True
-                        return FetchResult(status=FetchStatus.FORBIDDEN, error_code="FORBIDDEN")
+                        return FetchResult(
+                            status=FetchStatus.FORBIDDEN, error_code="FORBIDDEN"
+                        )
 
                     elif status == 404:
-                        await breaker.record_reachable()
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return FetchResult(status=FetchStatus.NOT_FOUND)
 
                     elif status == 429:
-                        # Contract assumption for this example: 429 is caller/quota throttling,
-                        # not evidence that the dependency is unavailable. Change this policy if
-                        # the real upstream uses 429 to signal service overload.
+                        # Contract assumption: 429 enforces a caller quota (`policy_limit`),
+                        # not dependency saturation. Change this classification if the real
+                        # upstream contract uses 429 to signal `overloaded` instead.
                         # No normative guidance exists here; Azure's breaker trips on 429 while
                         # Polly excludes it by default, so this must follow the real contract.
-                        await breaker.record_reachable()
+                        await breaker.record_success(permit)
                         probe_resolved = True
+                        hint = _parse_retry_after(
+                            resp.headers.get("retry-after"), config.max_retry_after_s
+                        )
                         return FetchResult(
                             status=FetchStatus.RATE_LIMITED,
-                            error_code="RATE_LIMITED",
-                            retry_after_s=_parse_retry_after(
-                                resp.headers.get("retry-after"), config.max_retry_after_s
+                            error_code=(
+                                "RETRY_AFTER_EXCEEDS_BUDGET"
+                                if hint.exceeds_limit
+                                else "RATE_LIMITED"
                             ),
+                            retry_after_s=hint.delay_s,
                         )
 
                     elif status == 408:
-                        # RFC 9110 s15.5.9: the origin "did not receive a complete
-                        # request message within the time that it was prepared to
-                        # wait... it MAY repeat that request." Transient, and the
-                        # request demonstrably never ran, so repeating is safe.
-                        # Breaker-neutral: this reflects request transmission, not
-                        # dependency health.
-                        await breaker.record_reachable()
+                        # This GET is contractually idempotent, so RFC 9110 s9.2.2
+                        # permits automatic replay after a communication failure.
+                        # The same response does not prove a write was unapplied.
+                        # Breaker-neutral: 408 describes request transmission, not
+                        # dependency availability.
+                        await breaker.record_reachable(permit)
                         probe_resolved = True
                         retry_error_code = "UPSTREAM_REQUEST_TIMEOUT"
-                        retry_after_hint = _parse_retry_after(
+                        hint = _parse_retry_after(
                             resp.headers.get("retry-after"), config.max_retry_after_s
                         )
+                        if hint.exceeds_limit:
+                            return FetchResult(
+                                status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+                                error_code="RETRY_AFTER_EXCEEDS_BUDGET",
+                            )
+                        retry_after_hint = hint.delay_s
 
-                    elif 400 <= status < 500:
-                        await breaker.record_reachable()
+                    elif status == 400:
+                        await breaker.record_success(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.INVALID_REQUEST,
                             error_code="CLIENT_ERROR",
                         )
 
+                    elif 400 <= status < 500:
+                        await breaker.record_reachable(permit)
+                        probe_resolved = True
+                        return FetchResult(
+                            status=FetchStatus.UNEXPECTED_RESPONSE,
+                            error_code="UNEXPECTED_CLIENT_STATUS",
+                        )
+
                     else:
-                        await breaker.record_reachable()
+                        await breaker.record_reachable(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
                             error_code="UNEXPECTED_HTTP_STATUS",
                         )
 
+            except httpx.DecodingError:
+                await breaker.record_reachable(permit)
+                probe_resolved = True
+                return FetchResult(
+                    status=FetchStatus.INVALID_PAYLOAD,
+                    error_code="UNSUPPORTED_CONTENT_ENCODING",
+                )
+            except httpx.PoolTimeout:
+                return FetchResult(
+                    status=FetchStatus.OVERLOADED,
+                    error_code="LOCAL_POOL_TIMEOUT",
+                )
             except (TimeoutError, httpx.TimeoutException):
-                await breaker.record_failure()
+                await breaker.record_failure(permit)
                 probe_resolved = True
                 retry_error_code = "UPSTREAM_TIMEOUT"
-            except httpx.RequestError:
-                await breaker.record_failure()
+            except httpx.NetworkError:
+                await breaker.record_failure(permit)
                 probe_resolved = True
                 retry_error_code = "TRANSPORT_ERROR"
+            except httpx.RequestError:
+                return FetchResult(
+                    status=FetchStatus.UNEXPECTED_RESPONSE,
+                    error_code="NON_RETRYABLE_REQUEST_ERROR",
+                )
             finally:
                 if not probe_resolved:
-                    await breaker.release_probe()
+                    await breaker.release_probe(permit)
 
             if retry_error_code is None:
                 # Defensive invariant: all retry paths must state why they are retrying.
@@ -583,13 +790,13 @@ async def fetch_user_profile(
                     retry_after_s=retry_after_hint,
                 )
 
-            if retry_after_hint is not None:
-                # A bounded server hint beats our own guess. The outer deadline
-                # still caps the total wait.
-                await asyncio.sleep(retry_after_hint)
-            else:
-                raw_delay = min(config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1)))
-                await asyncio.sleep(random.uniform(0.0, raw_delay))
+            raw_delay = min(
+                config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1))
+            )
+            jitter = random.uniform(0.0, raw_delay)
+            # Retry-After is a minimum, not an exact synchronized wake time.
+            # Positive jitter spreads clients; the outer deadline caps total wait.
+            await asyncio.sleep((retry_after_hint or 0.0) + jitter)
 
         # Unreachable: every path above returns. Reaching here is an internal
         # invariant break, not a dependency problem.
@@ -602,7 +809,9 @@ async def fetch_user_profile(
         async with asyncio.timeout(config.deadline_s):
             return await run()
     except TimeoutError:
-        logger.warning("User fetch exceeded operation deadline", extra={"request_id": request_id})
+        logger.warning(
+            "User fetch exceeded operation deadline", extra={"request_id": request_id}
+        )
         return FetchResult(
             status=FetchStatus.CANCELLED,
             error_code="DEADLINE_EXCEEDED",
