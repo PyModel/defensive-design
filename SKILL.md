@@ -1,10 +1,10 @@
 ---
 name: defensive-design
-description: Use when designing, implementing, or reviewing code that crosses trust boundaries, calls external dependencies, mutates durable state, runs concurrently, handles untrusted input, or consumes finite resources. Applies to production-readiness, resilience, timeouts, retries, idempotency, backpressure, rate limiting, graceful degradation, failover, consistency, webhooks, queues, databases, caches, files, LLM or tool calls, happy-path-only drafts, and debugging a production incident or cascading failure. Skip for deterministic in-memory helpers with no meaningful external effects.
+description: Use when designing, implementing, reviewing, or debugging production code where hostile input, external dependencies, concurrency, durable effects, finite resources, or privileged actions can violate a contract. Guides proportional secure design, failure handling, retries, idempotency, capacity, recovery, and verification. Skip pure deterministic helpers with no meaningful boundary or side effect.
 license: MIT
 metadata:
   author: PyModel
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Defensive Design
@@ -23,13 +23,13 @@ Be pessimistic at boundaries and economical in implementation. Defensive complex
 2. **Availability degrades only through a safe explicit path.** A fallback must preserve the same critical constraints, be bounded, expose its degraded state, and have a recovery path.
 3. **All work is bounded.** Every wait, retry, loop, queue, batch, fan-out, recursion path, and resource allocation needs a limit or inherited budget.
 4. **Retried writes need effect-once behavior.** Use idempotency, atomic deduplication, transactional state, provider idempotency, or reconciliation. Do not casually claim exactly-once delivery.
-5. **Outcomes remain distinct.** No-data, invalid, denied, conflict, partial, degraded, cancelled, and failed are not interchangeable with `None`, `False`, an empty collection, or generic success.
+5. **Outcomes remain distinct.** No-data, invalid, denied, conflict, policy-limited, partial, degraded, cancelled, and failed are not interchangeable with `None`, `False`, an empty collection, or generic success.
 6. **Untrusted context stays untrusted.** Validate user input, dependency output, retrieved content, model output, webhook payloads, and tool results before they affect state or privilege.
 7. **Repository evidence outranks generic advice.** Reuse existing contracts and cross-cutting infrastructure before creating new wrappers or frameworks.
 8. **Claims carry an evidence state.** Every verification or completion claim is labelled `verified` (actually executed or authoritative runtime output inspected), `reasoned_not_run` (follows from code inspection, not executed), `blocked` (appropriate but unavailable — no environment, credentials, or tooling), or `not_applicable`. Confidence is not evidence.
 9. **Recovery must not amplify failure.** Retries, failover, cache rebuilds, autoscaling, and error-handling paths themselves all create work. Before adding one, answer: does this add load to an already-failing system, and what bounds it? Overload can sustain itself after its original trigger is gone.
 
-A quota, cache, fallback, or rate limiter is not automatically an availability control. Classify whether it protects security, abuse, cost, contractual limits, or integrity before deciding how it fails.
+A quota, budget, or rate limiter that protects security, abuse, cost, safety, or a contract is a policy control, not ordinary capacity overload. Preserve its authoritative limit during dependency failure; never fail it open merely to improve availability.
 
 ## Apply Proportionally
 
@@ -47,6 +47,8 @@ Tier follows consequence, not size. A five-line cross-tenant authorization check
 Do not add retries, breakers, failover, or telemetry to a pure helper without a real failure surface.
 
 For Tier 2 or Tier 3 work, or whenever a control is unfamiliar, read `references/defensive-checklists.md` before implementing.
+
+For any security-sensitive change — identity, authority, credentials, cryptography, sensitive data, dependency or build integrity, or untrusted data reaching a database, browser, shell, template, filesystem, deserializer, URL fetcher, model, or tool — read `references/secure-coding-overlay.md` regardless of tier.
 
 ## Workflow
 
@@ -79,27 +81,30 @@ Analyze failures that are severe, plausible, difficult to detect, or capable of 
 
 For non-trivial work, use this compact table:
 
-| Operation | Failure | Class | Invariant at risk | Required behavior | Detection and test |
+| Operation | Failure | Decision labels (result / cause / effect) | Invariant at risk | Required behavior | Detection and test |
 |---|---|---|---|---|---|
 
 ### 3. Classify Before Handling
 
-| Failure class | Default behavior |
-|---|---|
-| Valid absence (`absence`) | Return an explicit no-data result. No retry. |
-| Invalid input or contract (`invalid`) | Reject with a stable error. No retry. |
-| Unauthenticated or unauthorized (`unauthenticated`, `unauthorized`) | Fail closed. No fallback that broadens access. |
-| Conflict or stale version (`conflict`) | Return conflict, or perform a bounded compare-and-retry only when designed for it. |
-| Known transient dependency failure (`transient_dependency`) | Retry only when repeat-safe and the overall deadline allows it. |
-| Overload or saturation (`overloaded`) | Backpressure, bounded queueing, load shedding, or retry hint. Avoid retry amplification. |
-| Ambiguous write outcome (`unknown_outcome`) | Resolve through idempotency lookup, provider status, or reconciliation. Never blindly repeat the effect. |
-| Partial success (`partial_success`) | Return explicit item-level or typed partial state, then reconcile or compensate as required. |
-| Permanent dependency or configuration failure (`permanent_dependency`) | Fail fast and avoid retry storms. Affect readiness when safe service is impossible. |
-| Stale or superseded work (`stale_work`) | Drop or cancel it. Work past its usefulness deadline, TTL, lease, or version consumes capacity without producing value. Do not retry it. |
-| Cancellation or deadline expiry (`cancelled`) | Stop new work, clean up owned resources, preserve committed state, and propagate cancellation. |
-| Internal invariant violation (`invariant_violation`) | Stop the unsafe operation, preserve evidence, and surface an internal failure. |
+These labels answer different questions: what the caller should observe, why it happened, and whether an effect occurred. Several labels can apply to one event; do not force them into one enum.
 
-Backticked names are canonical; `references/failure-taxonomy.md` holds the full table, the retry and outcome-certainty rules, and the failure envelope.
+| Decision label | Axis | Default behavior |
+|---|---|---|
+| Valid absence (`absence`) | Result | Return explicit no-data. No retry. |
+| Invalid input or contract (`invalid`) | Result | Reject with a stable error. No retry. |
+| Missing or insufficient authority (`unauthenticated`, `unauthorized`) | Result | Fail closed. Never broaden access through fallback. |
+| Conflict or stale version (`conflict`) | Result | Return conflict, or bounded compare-and-retry only when designed for it. |
+| Security, abuse, cost, safety, or contractual limit (`policy_limit`) | Policy | Enforce the authoritative limit. Fail closed if enforcement is unavailable. |
+| Capacity saturation (`overloaded`) | State | Apply admission control, backpressure, or shedding. Avoid retry amplification. |
+| Contract-defined transient dependency failure (`transient_dependency`) | Cause | Retry only when the operation is repeat-safe and the overall deadline allows it. |
+| Permanent dependency, protocol, or configuration failure (`permanent_dependency`) | Cause | Fail fast; do not retry. Affect readiness only when safe service is impossible. |
+| Effect may already exist (`unknown_outcome`) | Effect certainty | Resolve through status lookup, same-key replay, or reconciliation. Never blindly repeat. |
+| Some intended effects completed (`partial_success`) | Effect certainty | Return explicit item-level state, then reconcile or compensate as required. |
+| Work is no longer useful (`stale_work`) | State | Drop or cancel it. Do not retry it. |
+| Caller or system stopped the operation (`cancelled`) | Result | Stop new work, release owned resources, preserve committed state, and propagate cancellation. |
+| Internal invariant broke (`invariant_violation`) | Cause | Stop the unsafe operation, preserve evidence, and surface an internal failure. |
+
+`references/failure-taxonomy.md` defines the full multi-axis envelope, repeat-safety test, and boundary representation.
 
 A broad catch is acceptable only at a deliberate boundary that classifies, records, converts, compensates, degrades, or re-raises the error. Never catch broadly merely to continue.
 
@@ -119,13 +124,13 @@ If those answers are weak, omit or simplify it.
 - Validate authority, shape, size, and semantics before expensive or privileged work.
 - Keep security checks at the authoritative boundary and apply them unchanged to retries, caches, fallbacks, and recovery.
 - Use an overall deadline plus bounded per-attempt timeouts for remote work.
-- Assign one retry owner per call chain. Retry only known transient failures, with capped backoff and jitter, when the operation is repeat-safe.
+- Assign one automatic transport-retry owner per call chain. Automatically retry only contract-defined transient failures, with capped backoff and jitter, when the operation is repeat-safe. Treat conflict compare-and-retry and same-identity replay or reconciliation after an unknown outcome as explicit semantic recovery, not as a transient transport retry. Repeat safety comes from semantics and effect certainty, not labels such as read, write, GET, or POST alone.
 - Bind idempotency keys to authenticated scope and canonical request semantics. Claim them atomically with the state transition or provide reconciliation for crash gaps.
 - Enforce concurrency invariants with transactions, constraints, compare-and-swap, locks, leases, or fencing, not timing assumptions. A lease bounds who *should* own a resource; it does not prove a stalled former holder has stopped. Where a stale holder can still mutate shared or external state, the protected resource must itself reject writes below the current fencing or generation number. An unchecked token is decorative.
 - Bound task creation, queue depth *and queue age*, batches, payloads, result sets, retries, fan-out, recursion, memory, and connection use. Depth alone hides the case where nothing in the queue is still useful.
 - Preserve cancellation and structured cleanup. Do not swallow cancellation as ordinary failure.
 - Represent partial, degraded, stale, denied, and failed outcomes explicitly.
-- Log structured diagnostic data without secrets. Keep metric labels bounded — operation, dependency, status family, failure class, retryability. The last two are house conventions with no OpenTelemetry counterpart; the stable spellings for HTTP are `http.request.method`, `http.response.status_code`, `server.address`, and `error.type`. Tenant, user, idempotency key, raw URL, and prompt text belong in logs or traces under policy, and become metric dimensions only as opt-in attributes, never on by default. Audit privileged or irreversible effects where policy requires it.
+- Log only allowlisted diagnostic fields. Treat tenant, user, session, idempotency key, raw URL, headers, payload, prompt text, tokens, and credentials as sensitive by default; omit, redact, or replace them with approved opaque correlation values. Apply the same policy to client-library and proxy/access logs, or use non-sensitive opaque identifiers in logged path segments. Sanitize untrusted values against log injection. Keep metric labels bounded — operation, dependency, status family, failure class, retryability. The last two are house conventions with no OpenTelemetry counterpart; the stable OpenTelemetry spellings for HTTP are `http.request.method`, `http.response.status_code`, `server.address`, and `error.type`. Audit privileged or irreversible effects where policy requires it.
 - Reuse repository-native abstractions. Do not create a second resilience stack for one call site.
 
 When implementation is requested, provide complete in-scope code rather than placeholders. Do not weaken tests, broaden permissions, silently reduce scope, or claim production readiness for unverified behavior.
@@ -148,7 +153,7 @@ Prefer deterministic clocks, injected randomness, controllable fakes, and synchr
 
 Report exact commands and outcomes. Label every claim with its evidence state — `verified`, `reasoned_not_run`, `blocked`, `not_applicable` — and never imply an unrun check passed.
 
-Verification depth scales with tier. Tier 0/1 is deterministic tests, malformed input, timeout, and cancellation. Tier 2 adds duplicate delivery, concurrency, ambiguous write outcome, redelivery, rollback, and dependency fault injection. Tier 3 adds negative authorization and tenancy, fail-closed dependency outage, approval binding, and a recovery drill. Production chaos is optional, and only with a stated steady-state hypothesis, a bounded blast radius, and an automatic stop condition. See `references/verification-and-chaos.md`.
+Verification depth scales with tier. Tier 0/1 is focused contract tests, malformed input, timeout, and cancellation. Tier 2 adds duplicate delivery, concurrency, ambiguous write outcome, redelivery, rollback, and dependency fault injection. Tier 3 adds sink-specific adversarial input, negative authorization and tenancy, fail-closed policy outage, secret canaries, approval binding, and a recovery drill. Production chaos is optional, and only with a stated steady-state hypothesis, a bounded blast radius, and an automatic stop condition. See `references/verification-and-chaos.md`.
 
 ## Control Rules
 
@@ -159,6 +164,7 @@ Verification depth scales with tier. Tier 0/1 is deterministic tests, malformed 
 - Stop on cancellation, exhausted deadline, exhausted attempts, or evidence of permanent failure.
 - Respect safe server retry hints such as `Retry-After`.
 - Avoid nested retry multiplication across clients, services, proxies, and workers.
+- Decide repeat safety from the operation contract and effect certainty. A method name or a description such as "read" does not prove replay safety.
 - A circuit breaker is justified only when repeated remote failure would amplify load or exhaust resources. Define counted failures, open and half-open behavior, probe limits, observability, and fallback.
 
 ### State and Idempotency
@@ -181,6 +187,7 @@ Verification depth scales with tier. Tier 0/1 is deterministic tests, malformed 
 - Apply backpressure before saturation. Reject, defer, sample, or shed work deliberately. Prefer rejecting at admission over accepting work that cannot finish before it stops being useful.
 - Bound the age of the oldest useful work, not just queue depth. Shed stale work first.
 - Under overload: reduce optional work, sharply constrain or stop retries, shed low-priority and stale work, preserve critical capacity, and expose the overloaded state.
+- Enforce policy limits independently of overload controls. Cost, abuse, safety, and contractual budgets do not become retryable or fail-open when their backing service is unavailable.
 - Ensure fallback capacity can handle failover traffic.
 
 ### Errors and Degradation
@@ -246,6 +253,8 @@ Apply relevant rules without ceremony. Report changed behavior and verification 
 - A lease guards external mutation and nothing rejects the stale holder.
 - A fallback widens authorization, or silently feeds an authoritative or irreversible decision.
 - A model or its tool output decides its own authorization or scope.
+- A policy limit is bypassed because its backing store or service failed.
+- Sensitive or attacker-controlled data enters logs, traces, metrics, or audit records without explicit allowlisting and sanitization.
 - Shared state relies only on process-local locking.
 - Metrics carry unbounded label values.
 - Production readiness is asserted without failure-path evidence, or tests are claimed without having been run.
@@ -258,17 +267,19 @@ Do not declare completion until the applicable statements are true:
 - Critical boundaries fail closed.
 - Remote waits have an effective timeout or inherited deadline.
 - Loops, retries, queues, batches, fan-out, recursion, and resource use are bounded.
-- One layer owns retries and retries only classified repeat-safe failures.
+- One layer owns automatic transport retries; they are bounded, jittered, and limited to contract-defined transient, repeat-safe failures. Conflict retry and unknown-outcome replay use explicit semantic recovery.
 - Duplicate-prone writes are effect-once or reconciled after ambiguous outcomes.
 - Concurrency invariants are enforced atomically.
 - Cancellation and shutdown preserve committed state and release owned resources.
 - Partial, degraded, stale, denied, no-data, cancelled, and failed outcomes remain distinct.
+- Policy limits remain authoritative and distinct from capacity overload.
 - Fallbacks preserve the same security context and cannot silently become authoritative.
 - Logs, metrics, traces, and audits are useful without leaking sensitive data.
 - Queue depth and queue age are bounded, and stale work is dropped rather than processed.
 - Leases that guard shared or external state are fenced, and the resource rejects stale generations.
 - Recovery paths — retry, replay, failover, rebuild, drain — are bounded and cannot amplify the failure they respond to.
 - Existing repository facilities for retries, timeouts, idempotency, and telemetry were reused rather than duplicated by a second resilience stack.
+- Applicable `secure-coding-overlay.md` controls and negative checks were completed for every security-sensitive boundary.
 - Failure-path checks ran against the final relevant code state.
 - Every completion claim carries an evidence state, and nothing unrun is reported as passing.
 
@@ -278,6 +289,6 @@ The goal is not maximum machinery. The goal is minimum verified protection again
 
 When a concrete Python outbound-HTTP example would help, inspect `references/resilient_http_example.py`. Treat it as an illustrative pattern, not a universal template. Reuse only the mechanisms justified by the current task.
 
-`references/failure-taxonomy.md` holds the full failure-class table, the failure envelope, and how to express these classes over HTTP. `references/verification-and-chaos.md` holds the per-surface verification matrix, the runtime signals that reveal amplification, chaos-experiment gates, and the rollout/rollback contract. Read them when the work is Tier 2 or Tier 3, or when a control is unfamiliar.
+`references/failure-taxonomy.md` holds the multi-axis failure envelope and how to express it over a boundary. `references/secure-coding-overlay.md` holds threat, sink, authority, data, dependency, and negative-verification guidance for security-sensitive work. `references/verification-and-chaos.md` holds the per-surface verification matrix, amplification signals, chaos gates, and rollout/rollback contract.
 
-For maintainers, trigger evals live in `evals/defensive-design.prompts.csv`, behavior expectations in `evals/behavior-rubric.md`, and deterministic regression checks for the Python reference in `scripts/verify_reference.py`.
+For maintainers, trigger evals live in `evals/defensive-design.prompts.csv`, behavior expectations in `evals/behavior-rubric.md`, and self-contained regression checks for the Python reference in `scripts/verify_reference.py`.
