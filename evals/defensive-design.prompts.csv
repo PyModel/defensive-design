@@ -7,19 +7,43 @@ test-05,false,"Rename these fields in a dataclass to camelCase."
 test-06,false,"Generate a CREATE TABLE statement for a throwaway SQLite unit-test fixture."
 test-07,true,"Validate a JSON request body received from an untrusted HTTP client."
 test-08,false,"Parse this hard-coded JSON fixture used only by a unit test."
-test-09,true,"Review this retry loop and point out bugs. Do not implement code."
-test-10,true,"Verify whether this background consumer handles task cancellation safely."
-test-11,true,"What happens if the auth service times out during permission evaluation?"
-test-12,true,"How should this async file uploader handle task cancellation?"
-test-13,true,"This SDK already retries transient network errors. Make my wrapper more resilient."
-test-14,true,"A POST sometimes times out after the server may have charged the card. Make this safe to retry."
-test-15,true,"Traffic spikes cause this worker pool queue to grow until the process is OOM-killed."
-test-16,true,"Our rate limiter's Redis backend is down. Should the limiter fail open so requests keep flowing?"
+test-09,true,"Review and list bugs only; do not edit:
+async def charge():
+    for _ in range(3):
+        try:
+            return await client.post('/charge', json=body)
+        except Exception:
+            pass"
+test-10,true,"Verify this consumer:
+async def consume(msg):
+    try:
+        await handle(msg)
+    except BaseException:
+        await queue.ack(msg)
+    return None"
+test-11,true,"Assess this permission check:
+try:
+    allowed = await authz.can(user, action)
+except TimeoutError:
+    allowed = True"
+test-12,true,"Make this uploader cancellation-safe: it opens a temp file, starts remote.put(temp), catches CancelledError and returns, but has no finally cleanup."
+test-13,true,"The SDK client has retries=3. Our wrapper also retries every RequestError three times. Make the call resilient without multiplying attempts."
+test-14,true,"This payment POST retries with a new idempotency key after any timeout; the provider may have charged before the response was lost. Make replay safe."
+test-15,true,"Each request creates an asyncio task and puts work into an unbounded Queue; during a slow dependency, memory grows until OOM. Fix overload behavior."
+test-16,true,"Redis enforces a per-account spend cap. If Redis is down, this code returns allowed=True so checkout stays available. Is that safe?"
 test-17,true,"This worker takes a distributed lock with a 30s TTL before overwriting an object in S3. Is that safe?"
 test-18,true,"Checkout latency spiked an hour ago and has not recovered even though traffic dropped back to normal."
 test-19,false,"Add a docstring to this pure string-formatting helper."
-test-20,true,"We publish an order.confirmed event right after committing the order row. Make it reliable."
+test-20,true,"This code commits an order row, then publishes order.confirmed; a crash between them loses the event, and a crash after publish can duplicate it. Make it reliable."
 test-21,false,"Convert this in-memory list comprehension to a generator expression."
-test-22,true,"Our Stripe webhook endpoint updates the order then returns 200. Make it production-ready."
-test-23,true,"Add a Redis cache in front of this per-user document lookup to cut latency."
-test-24,true,"Give our support agent a delete_account tool so it can close accounts when users ask."
+test-22,true,"A multi-tenant webhook reads an allowlisted key_id header to select a tenant key, parses JSON, then verifies the signature and updates the order. Make it safe and replay-resistant."
+test-23,true,"Add Redis before this per-user document lookup. Current cache key is document:{document_id}; authorization runs only on a cache miss."
+test-24,true,"Give our support agent a delete_account tool. The model supplies account_id and the tool trusts it after a generic yes/no approval."
+test-25,true,"Two requests run balance = SELECT balance, verify balance >= amount, then UPDATE balance = balance - amount without a transaction or version check. Preserve non-negative balance."
+test-26,true,"A worker catches every message error and immediately nack(requeue=True); one malformed message now loops forever and blocks its partition. Fix poison handling."
+test-27,true,"A deploy renames customer_name to display_name and immediately drops the old column while old and new app versions run together. Design a safe rollout and rollback."
+test-28,true,"Review this telemetry: logger.error('failed user=%s url=%s prompt=%s key=%s', user.id, request.url, prompt, idempotency_key)."
+test-29,true,"GET /jobs/next leases and removes the next job. The client retries GET automatically after a response timeout because it calls the operation a read. Is that safe?"
+test-30,true,"Fix command injection: subprocess.run(f'convert {upload_name} {output_name}', shell=True, check=True)."
+test-31,true,"Add the package random-py-utils to implement a four-line slug helper. Review the repository and make the smallest safe dependency decision."
+test-32,true,"Make this admin service production-ready: debug=True, binds 0.0.0.0, uses a default password, and exposes /admin without an authorization check."
