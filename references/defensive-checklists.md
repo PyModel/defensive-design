@@ -2,7 +2,8 @@
 
 Companion to `SKILL.md`. Use these when the change is Tier 2 or Tier 3, or when a
 control is unfamiliar. Failure classification lives in `references/failure-taxonomy.md`;
-verification, runtime signals, and rollout gates live in `references/verification-and-chaos.md`. Each item is a question to answer, not a mandate to
+security-sensitive boundaries live in `references/secure-coding-overlay.md`; verification,
+runtime signals, and rollout gates live in `references/verification-and-chaos.md`. Each item is a question to answer, not a mandate to
 implement. An item that does not apply to the change is answered "not applicable
 because ..." and dropped.
 
@@ -20,18 +21,18 @@ because ..." and dropped.
 
 - [ ] Is exactly one layer in the call chain responsible for retrying this operation?
 - [ ] Have nested retries across SDK, client wrapper, service, proxy, and worker been checked for multiplication?
-- [ ] Is the failure classified as transient before a retry is attempted, rather than retrying every exception?
-- [ ] Is the operation repeat-safe, or protected by idempotency, before any retried write?
+- [ ] For automatic transport retry, is the failure contract-defined as transient rather than merely caught as an exception? Are conflict retry and unknown-outcome replay handled as explicit semantic recovery instead?
+- [ ] Is the operation repeat-safe by contract, or protected by idempotency, regardless of whether its name says read, write, GET, or POST?
 - [ ] Is there a maximum attempt count *and* a deadline check, so retries stop on whichever comes first?
 - [ ] Does the backoff cap its delay and include jitter?
-- [ ] Are server retry hints such as `Retry-After` honored, and bounded so a hostile or broken value cannot stall the caller?
-- [ ] Are permanent failures (validation, auth, not-found, unsupported) excluded from retry?
+- [ ] Are server retry hints such as `Retry-After` treated as minimums, never shortened, combined with bounded jitter, and rejected for automatic retry when they exceed the local budget?
+- [ ] Are permanent failures (validation, denied authority, unsupported protocol, configuration) excluded from retry, with absence handled according to the dependency contract?
 - [ ] Does retry behavior avoid amplifying load during a dependency-wide outage?
 
 ## Circuit Breakers and Load Shedding
 
 - [ ] Is there evidence that repeated failure would amplify load or exhaust a resource? If not, omit the breaker.
-- [ ] Which failures count toward opening: timeouts, 5xx, connection errors? Are 4xx excluded from counting *and* kept from resetting the counter? A client error that zeroes the failure count lets an alternating 5xx/4xx dependency hold the breaker closed forever.
+- [ ] Which contract outcomes count as availability failures, which prove a healthy result (including valid absence), and which are neutral? Do not classify or reset blindly by status family.
 - [ ] Can a probe that is cancelled mid-flight leave the breaker half-open with no timer able to re-arm it?
 - [ ] What is the open duration, and what limits probe traffic in the half-open state?
 - [ ] What happens to callers while the breaker is open: error, fallback, or queue? Is that path bounded?
@@ -84,6 +85,15 @@ because ..." and dropped.
 - [ ] For each recovery mechanism — retry, replay, failover, cache rebuild, backlog drain, autoscaling — does it add work to an already-failing system, and what bounds that work? Overload can sustain itself after its original trigger is gone.
 - [ ] Under sustained overload, is there a path that reduces optional work, stops retries, and sheds stale requests, rather than only queueing harder?
 
+## Policy Limits
+
+- [ ] What invariant does the limit protect: security, abuse, cost, safety, contract, or capacity?
+- [ ] Is `policy_limit` kept distinct from `overloaded`, even if both share a transport status such as 429?
+- [ ] Is enforcement authoritative and atomic across every process or region that claims to share the limit?
+- [ ] Are reset, reservation, refund, expiry, and clock semantics explicit?
+- [ ] Are attacker-controlled keys and stored counters bounded against cardinality and memory abuse?
+- [ ] If the enforcement dependency fails, does the protected invariant remain closed rather than silently granting more authority or budget?
+
 ## Cancellation and Shutdown
 
 - [ ] Is cancellation propagated to downstream calls rather than being caught and treated as an ordinary failure?
@@ -104,6 +114,9 @@ because ..." and dropped.
 - [ ] Can degraded or stale output reach a privileged, irreversible, or financial decision? If so, that path fails closed instead.
 
 ## Untrusted Input and Trust Boundaries
+
+For data reaching an interpreter, privileged API, durable store, filesystem, outbound
+network request, model, or tool, also apply `references/secure-coding-overlay.md`.
 
 - [ ] Is authority checked at the authoritative boundary, before expensive or privileged work?
 - [ ] Is the same authorization applied unchanged on retry, cache-hit, fallback, replay, and recovery paths?
@@ -130,7 +143,7 @@ because ..." and dropped.
 - [ ] Is there a maximum attempt count with dead-lettering, and is the dead-letter queue monitored and drainable?
 - [ ] Is poison-message handling defined, so one bad payload cannot stall the partition or the worker pool?
 - [ ] Where ordering matters, is it actually guaranteed by the transport and preserved by the consumer's concurrency model?
-- [ ] Are webhook signatures verified before any tenant resolution, parsing, or side effect?
+- [ ] Is the raw webhook body preserved, with any verification key selected only from trusted routing context or a strictly validated key id, before payload fields are trusted or any side effect occurs?
 - [ ] Is webhook delivery deduplicated by provider event id, with replay-window and timestamp checks?
 - [ ] Does the webhook endpoint respond within the provider's timeout, deferring slow work to a durable queue?
 
@@ -145,8 +158,9 @@ because ..." and dropped.
 
 ## Observability
 
-- [ ] Do logs carry enough correlation context (request, tenant, operation, attempt) to reconstruct a failure?
-- [ ] Are secrets, credentials, tokens, personal data, and payload bodies excluded from logs, traces, and error messages?
+- [ ] Do logs carry enough approved opaque correlation context (request, operation, attempt) to reconstruct a failure without exposing tenant or subject data by default?
+- [ ] Are secrets, credentials, tokens, personal data, raw URLs, prompts, idempotency keys, and payload bodies excluded or explicitly redacted from logs, traces, and error messages?
+- [ ] Are untrusted log values sanitized against control-character and line-forging injection?
 - [ ] Is metric cardinality bounded — no unbounded identifiers as label values?
 - [ ] Are degradation, fallback, shed, retry-exhaustion, breaker-open, and dead-letter events all countable?
 - [ ] Are privileged and irreversible effects audited where policy requires it, with append-only semantics?
@@ -165,6 +179,8 @@ evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
 - [ ] Timeout on a dependency: the caller stops within the deadline and reports the right class.
 - [ ] Transient failure followed by success: retried and resolved within the attempt and deadline budget.
 - [ ] Permanent failure: not retried, surfaced promptly.
+- [ ] An effectful operation described as a read: not retried unless its semantics and effect certainty make repetition safe.
+- [ ] Policy-enforcement dependency failure: authoritative security, abuse, cost, safety, or contractual limit remains enforced.
 - [ ] Retry budget exhausted: the correct terminal error, no partial effect left behind.
 - [ ] Duplicate request with the same idempotency key: one effect, consistent response.
 - [ ] Same key with different request semantics: conflict, not a silent replay.
@@ -184,3 +200,4 @@ evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
 - [ ] Stale lease holder resumes after a new holder acquired the lease: its write is rejected by fence.
 - [ ] Cache failure: treated as a miss where safe, never as an authorization bypass.
 - [ ] Logs and metrics from failure paths contain no secrets and no unbounded cardinality.
+- [ ] Secret canaries, encoded payloads, and sink-specific injection probes do not reach telemetry, syntax, privilege, or unintended resources.

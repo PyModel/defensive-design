@@ -24,6 +24,7 @@ Match rows to the failure surfaces the change actually has.
 | Failure surface | Minimum check | Tier 2/3 check | Runtime evidence |
 |---|---|---|---|
 | Input boundary | Invalid, missing, oversized, deeply nested, high-cardinality | Property or fuzz corpus, adversarial payloads | Reject counts by bounded reason class |
+| Security sink | Context-specific injection and canonicalization probes | Cross-boundary abuse cases from `secure-coding-overlay.md` | Denials and security findings by bounded class |
 | Remote timeout | Forced slow dependency | Deadline propagation across the whole chain | Deadline-exceeded rate, dependency latency percentiles |
 | Retry | Retryable and permanent failures | Retry storm against a degraded dependency | `retry_attempts / initial_attempts`, budget exhaustion |
 | Idempotency | Repeat the same key | Timeout after a simulated commit, then replay the key | Dedup hits, conflicting key reuse, unresolved operations |
@@ -32,9 +33,11 @@ Match rows to the failure surfaces the change actually has.
 | Consumer / inbox | Same message delivered twice | Crash after DB commit, before broker ack | Redelivery rate, dedup rate, oldest message age |
 | Poison handling | Permanently malformed message | Replay and quarantine procedure | Dead-letter depth, age, reason breakdown |
 | Backpressure | Saturate the concurrency or queue cap | Slow dependency plus high ingress | Oldest useful work age, admission rejects, saturation |
+| Policy limit | Limit reached and enforcement dependency unavailable | Concurrent/distributed reservation and reset behavior | Grants, denials, store failures, and budget remaining |
 | Lease and fencing | Lease expiry | Pause the old holder, let a new holder acquire, resume the old one | Fence-reject count, lease renewal failures |
 | Degradation | Dependency disabled | Several dependencies failing together | Degraded-response rate and duration |
 | Auth and tenancy | Negative authorization matrix | Authz provider outage, adversarial tenant identifiers | Deny and fail-closed rate, cross-scope anomalies |
+| Dependency/build integrity | Changed component identity and lock/provenance checks | Known-vulnerable or tampered fixture where supported | Scan findings, provenance failures, update age |
 | LLM and tools | Invalid args, unauthorized tool, exceeded budget | Prompt injection via retrieved content, approval replay | Tool attempts, denials, approval failures, budget exhaustion |
 | Cancellation | Cancel mid-operation | Worker killed during a durable transition | In-flight age, abandoned operations |
 | Recovery | Restart or failover | Controlled fault plus restore drill | Time to safe steady state, reconciliation backlog |
@@ -54,6 +57,7 @@ show a system feeding its own failure:
 | Deadline-exceeded rate | Callers are no longer receiving useful work inside their budget |
 | Dependency latency percentiles | Whether timeout budgets are tuned, or are themselves triggering retry storms |
 | Admission reject / shed rate | Whether the system is protecting itself under excess demand |
+| Policy-limit deny / enforcement-failure rate | Whether an authoritative budget is working, not whether capacity is saturated |
 | Concurrent work and pool wait | Saturation, visible before outright errors |
 | Oldest useful work age | Accepted work going stale even while depth looks healthy |
 | Redelivery and dead-letter rate | Consumer failure and poison-message pressure |
@@ -75,7 +79,7 @@ Progressive, not automatic:
 
 - **Tier 0/1** — deterministic unit, contract, malformed-input, deadline, and cancellation tests are normally enough.
 - **Tier 2** — add concurrency, duplicate, ambiguous-write, redelivery, overload, and dependency-fault tests in a controlled environment.
-- **Tier 3** — add adversarial and negative-authorization tests plus a production-like recovery drill.
+- **Tier 3** — add adversarial sink tests, negative authorization and tenancy tests, policy-dependency outage, secret canaries, and a production-like recovery drill.
 
 Production chaos is optional and never a default. Run one only with all of:
 
