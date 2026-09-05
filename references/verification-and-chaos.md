@@ -19,10 +19,15 @@ a pass. Never report a command's output that was not produced.
 
 ## Verification matrix
 
-Match rows to the failure surfaces the change actually has.
+Match rows to the failure surfaces the change actually has. Tier changes depth, not
+applicability: pure computation has no network deadline to test, while consequential
+arithmetic may need strong boundary/property tests without any distributed machinery.
 
 | Failure surface | Minimum check | Tier 2/3 check | Runtime evidence |
 |---|---|---|---|
+| Local computation | Boundary values, units, rounding, overflow, empty input | Properties, numerical error budget, measured complexity | Precise error/result contract; telemetry only if useful |
+| UI / offline state | Stale completion, lifecycle cancellation, explicit accessible status | Interrupted sync, conflict/replay, persisted queue bounds | Pending age, sync/recovery state without sensitive content |
+| Filesystem / device | Interrupted writes and owned-resource cleanup | Crash/power-loss or hardware tests against the platform contract | Recovery state and approved safety signals |
 | Input boundary | Invalid, missing, oversized, deeply nested, high-cardinality | Property or fuzz corpus, adversarial payloads | Reject counts by bounded reason class |
 | Security sink | Context-specific injection and canonicalization probes | Cross-boundary abuse cases from `secure-coding-overlay.md` | Denials and security findings by bounded class |
 | Remote timeout | Forced slow dependency | Deadline propagation across the whole chain | Deadline-exceeded rate, dependency latency percentiles |
@@ -77,12 +82,13 @@ and retry numbers is how retry storms are inherited.
 
 Progressive, not automatic:
 
-- **Tier 0/1** — deterministic unit, contract, malformed-input, deadline, and cancellation tests are normally enough.
+- **Tier 0/1** — focused contract and boundary tests; deadline and cancellation tests only when those surfaces exist.
 - **Tier 2** — add concurrency, duplicate, ambiguous-write, redelivery, overload, and dependency-fault tests in a controlled environment.
 - **Tier 3** — add adversarial sink tests, negative authorization and tenancy tests, policy-dependency outage, secret canaries, and a production-like recovery drill.
 
 Production chaos is optional and never a default. Run one only with all of:
 
+- explicit authorization for this environment and fault experiment,
 - a stated steady-state hypothesis with the metric that defines it,
 - an explicitly bounded blast radius (which accounts, tenants, partitions, hosts),
 - an automatic stop condition tied to that metric,
@@ -114,3 +120,16 @@ postcondition         What evidence proves a safe steady state was reached?
 
 A software rollback that cannot interpret durable work created by the new
 version is not a rollback.
+
+## Evidence limitations
+
+A passing unit or mock-transport test proves only the exercised behavior. It does not
+prove real DNS, TLS, proxy, scheduling, hardware, crash-durability or provider behavior.
+An async timeout uses cooperative scheduling and cannot preempt blocking native/CPU
+work; test the completion boundary as well as the awaited timeout. Cancellation after
+a commit must preserve the committed/unknown effect classification.
+
+For a skill package, static metadata/link/corpus checks, executable example tests, and
+model behavior evaluations are separate evidence classes. Record the skill revision,
+model/host version, available tools, case-level results and failures before asserting
+behavioral quality. A rubric or a synthetic fixture is not an executed model evaluation.
