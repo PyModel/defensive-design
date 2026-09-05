@@ -10,24 +10,54 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify-reference:
-    name: Reference regression checks
+    # Preserve the branch-protection check names.
+    name: Reference regression checks (${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: python -m pip install --upgrade pip httpx
+      - name: Install HTTPX compatibility dependency
+        run: python -m pip install 'httpx>=0.27,<1'
 
       - name: Run deterministic reference checks
         run: python scripts/verify_reference.py
+
+      - name: Archive the checked source and environment
+        if: matrix.python-version == '3.11'
+        shell: bash
+        run: |
+          git archive --format=zip --prefix=defensive-design/ HEAD > "$RUNNER_TEMP/defensive-design.zip"
+          {
+            git rev-parse HEAD
+            python --version
+            python -m pip freeze
+          } > "$RUNNER_TEMP/verification-environment.txt"
+
+      - name: Upload checked source snapshot
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: checked-source-snapshot
+          path: |
+            ${{ runner.temp }}/defensive-design.zip
+            ${{ runner.temp }}/verification-environment.txt
+          if-no-files-found: error
+          retention-days: 3
