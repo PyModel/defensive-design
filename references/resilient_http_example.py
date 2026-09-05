@@ -1,7 +1,7 @@
 """Illustrative defensive outbound HTTP GET pattern.
 
 This example intentionally demonstrates only mechanisms that are relevant to a
-read-only HTTP lookup: strict configuration/input validation, a hard operation
+read-only HTTP lookup: strict configuration/input validation, a cooperative operation
 deadline, bounded/capped retry with full jitter, a small async circuit breaker,
 bounded response streaming, typed outcomes, contract-safe path segments, and redacted
 identifier logging by this module.
@@ -516,7 +516,12 @@ async def fetch_user_profile(
     request_id: str,
     config: ResilienceConfig,
 ) -> FetchResult[UserProfile]:
-    """Fetch a user profile under one hard wall-clock deadline.
+    """Fetch a user profile under one cooperative operation deadline.
+
+    Async cancellation cannot preempt synchronous parsing, logging, or cleanup.
+    Recheck the event-loop clock before returning so work that finishes after the
+    deadline is never reported as timely success. This is not a hard real-time
+    execution bound; blocking work needs its own resource/isolation policy.
 
     `request_id` is assumed to be an internal correlation identifier rather than
     user-provided content. If that is not true in the host application, sanitize
@@ -540,7 +545,7 @@ async def fetch_user_profile(
       before this function enforces its boundaries.
     - It must not perform transport-level retries. This function owns the retry
       loop, so a client built with `AsyncHTTPTransport(retries=N)` would
-      multiply attempts by N - the nested-retry amplification the checklist
+      multiply attempts by up to N + 1 - the nested-retry amplification the checklist
       warns about.
     """
 
@@ -678,8 +683,7 @@ async def fetch_user_profile(
                         # Contract assumption: 429 enforces a caller quota (`policy_limit`),
                         # not dependency saturation. Change this classification if the real
                         # upstream contract uses 429 to signal `overloaded` instead.
-                        # No normative guidance exists here; Azure's breaker trips on 429 while
-                        # Polly excludes it by default, so this must follow the real contract.
+                        # HTTP status alone cannot distinguish policy limits from saturation.
                         await breaker.record_success(permit)
                         probe_resolved = True
                         hint = _parse_retry_after(
@@ -805,9 +809,16 @@ async def fetch_user_profile(
             error_code="UNKNOWN_FAILURE",
         )
 
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + config.deadline_s
     try:
-        async with asyncio.timeout(config.deadline_s):
-            return await run()
+        async with asyncio.timeout_at(deadline):
+            result = await run()
+            # Synchronous work or an uncontended await can cross the deadline
+            # without yielding to the timeout callback. Check before returning.
+            if loop.time() >= deadline:
+                raise TimeoutError
+            return result
     except TimeoutError:
         logger.warning(
             "User fetch exceeded operation deadline", extra={"request_id": request_id}
