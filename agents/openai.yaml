@@ -1,6 +1,6 @@
 interface:
   display_name: "Defensive Design"
-  short_description: "Defensive coding and resilient system design"
-  default_prompt: "Use $defensive-design to review or implement this change with proportional security, resilience, and verification."
+  short_description: "Evidence-driven, architecture-neutral robustness"
+  default_prompt: "Use $defensive-design to assess this change using repository evidence and proportional controls. Respect the requested review, design, implementation, or incident scope."
 policy:
   allow_implicit_invocation: true
