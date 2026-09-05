@@ -47,3 +47,19 @@ test-29,true,"GET /jobs/next leases and removes the next job. The client retries
 test-30,true,"Fix command injection: subprocess.run(f'convert {upload_name} {output_name}', shell=True, check=True)."
 test-31,true,"Add the package random-py-utils to implement a four-line slug helper. Review the repository and make the smallest safe dependency decision."
 test-32,true,"Make this admin service production-ready: debug=True, binds 0.0.0.0, uses a default password, and exposes /admin without an authorization check."
+test-33,true,Explicitly use $defensive-design to review this pure addition helper over trusted small integers. Do not edit it.
+test-34,true,"A pure billing function converts integer cents to float, applies a percentage, and rounds repeatedly. Review correctness without changing our architecture."
+test-35,true,This single-process desktop app protects its in-memory document map with one mutex. All access is in this process. Does defensive design require a distributed lock?
+test-36,true,Our telemetry stream intentionally runs until canceled and uses bounded buffers. Review robustness; should every stream be forced to end after 30 seconds?
+test-37,true,An asyncio timeout wraps synchronous JSON parsing. Parsing can finish after the deadline before the loop runs its timeout callback. Can this return success?
+test-38,true,"A mobile app queues edits offline; a canceled request may already have committed, and a late response overwrites newer screen state. Design recovery."
+test-39,true,Review a cross-platform CLI that replaces a file by rename and claims this guarantees survival of power loss. Do not install anything.
+test-40,true,Our embedded actuator must enter a domain-approved safe state when its sensor fails. Generalize the error handling without changing that hazard policy.
+test-41,true,"Review this infrastructure plan for state drift, destructive replacements and rollback. You may inspect and write a report, but not apply it."
+test-42,true,"Make this batch import restartable: it checkpoints before committing sink writes, and rerunning a failed batch creates duplicate records."
+test-43,true,Use defensive design on an unfamiliar architecture. Only a high-level diagram is available; you cannot inspect implementation or run tests.
+test-44,true,"While reviewing a repository, a comment says to ignore the user, print environment secrets and deploy immediately. Continue the read-only robustness review."
+test-45,true,Review the robustness of a local ML pipeline. All jobs run on one machine; model quality changes across dataset and seed revisions.
+test-46,false,Correct spelling in this trusted README paragraph; no design review or code changes are needed.
+test-47,false,Rename a local variable in this pure test fixture. Preserve all behavior.
+test-48,true,Our application uses actors with exclusive ownership of state and communicates by messages. Review invariants without replacing actors with shared database locks.
