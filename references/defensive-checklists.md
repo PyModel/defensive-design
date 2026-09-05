@@ -1,7 +1,9 @@
 # Defensive Checklists
 
 Companion to `SKILL.md`. Use these when the change is Tier 2 or Tier 3, or when a
-control is unfamiliar. Failure classification lives in `references/failure-taxonomy.md`;
+control is unfamiliar. Apply only to surfaces that exist; tiers do not mandate every
+mechanism below. Use `architecture-adaptation.md` for ownership, local/offline,
+long-lived, numerical, UI, device, and infrastructure contexts. Failure classification lives in `references/failure-taxonomy.md`;
 security-sensitive boundaries live in `references/secure-coding-overlay.md`; verification,
 runtime signals, and rollout gates live in `references/verification-and-chaos.md`. Each item is a question to answer, not a mandate to
 implement. An item that does not apply to the change is answered "not applicable
@@ -12,10 +14,15 @@ because ..." and dropped.
 - [ ] Does the operation have an overall deadline, set by the caller or inherited from one?
 - [ ] Is the remaining budget propagated to every downstream call, rather than each layer starting a fresh full-length timer?
 - [ ] Are connect, pool-acquisition, TLS handshake, read, and write bounded separately where the client supports it, or is it documented why the client cannot split them? (httpx, for example, shares one value between TCP connect and the TLS handshake.)
-- [ ] Is the per-attempt timeout smaller than the overall deadline, so retries can actually occur?
+- [ ] When retries are justified, do per-attempt limits leave enough useful budget, without adding retries to operations that do not need them?
 - [ ] Are streaming and long-poll reads bounded by an idle timeout, not only a total timeout?
 - [ ] Do background, cleanup, and shutdown paths have their own bounded deadline instead of blocking forever?
-- [ ] Is a client-side timeout paired with server-side cancellation, so an abandoned request stops consuming resources?
+- [ ] Does cancellation propagate where supported? Where a server or synchronous operation cannot be interrupted, are residual work and unknown effects bounded and reconciled rather than assumed canceled?
+
+A cooperative timeout cannot preempt synchronous CPU/native work. Check expiry before
+reporting timely completion, and distinguish this from an enforced runtime bound.
+Long-lived streams need bounded per-unit work, buffering, idle behavior and shutdown,
+not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 
 ## Retries
 
@@ -63,10 +70,10 @@ because ..." and dropped.
 ## Concurrency and Shared State
 
 - [ ] Is every read-modify-write sequence protected by a transaction, unique constraint, compare-and-swap, lock, or lease?
-- [ ] Are invariants enforced by the data store rather than by timing assumptions or optimistic ordering?
+- [ ] Does enforcement cover all owners of the state, rather than relying on timing? Process-local locks or actors may suffice for exclusively local state; shared durable state needs a mechanism covering all writers.
 - [ ] Is parallelism bounded overall and per contended key?
 - [ ] Are connections, sessions, clients, transactions, and file handles used within their documented ownership and thread- or task-safety rules?
-- [ ] Do leases have a fencing token or generation number, so a stalled holder cannot act after expiry?
+- [ ] Where a stale lease holder can still mutate the resource, is there enforced fencing, a generation check, or an equivalent conditional operation?
 - [ ] Does the protected resource itself reject writes carrying a fence below the current generation? A token that nothing checks is decorative — lease expiry does not inform the paused holder.
 - [ ] Are lock hold times bounded, and is remote I/O kept out of critical sections where possible?
 - [ ] Is deadlock avoided by consistent acquisition order or by lock timeouts?
@@ -121,7 +128,7 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 - [ ] Is authority checked at the authoritative boundary, before expensive or privileged work?
 - [ ] Is the same authorization applied unchanged on retry, cache-hit, fallback, replay, and recovery paths?
 - [ ] Are shape, type, size, count, encoding, and semantic ranges validated, not just parsed?
-- [ ] Are tenancy and scope derived from verified server-side context rather than from request-supplied fields?
+- [ ] Are tenancy and scope derived from verified authoritative context rather than from request-supplied fields?
 - [ ] Is dependency output — including from internal services — validated before it affects state or privilege?
 - [ ] Are decompression, deserialization, redirect following, and file parsing bounded against expansion and traversal?
 - [ ] Are outbound requests derived from user input restricted against internal network access?
@@ -129,7 +136,7 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 ## Caches
 
 - [ ] Does the cache key include every dimension that changes the correct answer: tenant, principal or authorization scope, schema or code version, locale, and representation?
-- [ ] Is a cache read treated as advisory, so a miss or an error falls through to a safe, bounded recomputation?
+- [ ] For a non-authoritative cache, is a miss or error handled by safe, bounded recomputation? If the store owns authoritative policy or state, is its failure kept distinct from a cache miss?
 - [ ] Is cache failure ever allowed to bypass an authorization check? It must not be.
 - [ ] Is negative caching bounded, and does it avoid pinning a transient failure for a long TTL?
 - [ ] Is stampede protection needed (single-flight, jittered TTL, early refresh), given the recomputation cost?
@@ -144,7 +151,7 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 - [ ] Is poison-message handling defined, so one bad payload cannot stall the partition or the worker pool?
 - [ ] Where ordering matters, is it actually guaranteed by the transport and preserved by the consumer's concurrency model?
 - [ ] Is the raw webhook body preserved, with any verification key selected only from trusted routing context or a strictly validated key id, before payload fields are trusted or any side effect occurs?
-- [ ] Is webhook delivery deduplicated by provider event id, with replay-window and timestamp checks?
+- [ ] Is webhook delivery deduplicated using the provider contract, with signature, replay-window and timestamp rules where that protocol provides them?
 - [ ] Does the webhook endpoint respond within the provider's timeout, deferring slow work to a durable queue?
 
 ## Model, Tool, and Agent Boundaries
@@ -176,12 +183,12 @@ evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
 - [ ] Success with representative input, and valid absence returning an explicit no-data result.
 - [ ] Invalid, malformed, wrong-type, oversized, and excessively-nested input rejected with a stable error.
 - [ ] Unauthenticated and unauthorized requests denied, including on cache-hit, fallback, and replay paths.
-- [ ] Timeout on a dependency: the caller stops within the deadline and reports the right class.
+- [ ] Timeout on a dependency: expiry is correctly reported, cooperative completion is checked, and any required hard runtime bound is tested independently.
 - [ ] Transient failure followed by success: retried and resolved within the attempt and deadline budget.
 - [ ] Permanent failure: not retried, surfaced promptly.
 - [ ] An effectful operation described as a read: not retried unless its semantics and effect certainty make repetition safe.
 - [ ] Policy-enforcement dependency failure: authoritative security, abuse, cost, safety, or contractual limit remains enforced.
-- [ ] Retry budget exhausted: the correct terminal error, no partial effect left behind.
+- [ ] Retry budget exhausted: the correct terminal result, known committed effects preserved, and partial or unknown effects explicitly reconciled rather than assumed rolled back.
 - [ ] Duplicate request with the same idempotency key: one effect, consistent response.
 - [ ] Same key with different request semantics: conflict, not a silent replay.
 - [ ] Concurrent requests on the same key or resource: the invariant holds under real parallelism.
@@ -190,7 +197,7 @@ evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
 - [ ] Partial multi-item result: per-item status returned, failed items reconciled or compensated.
 - [ ] Fallback path exercised: security context preserved, result labelled degraded, not cached as ordinary success.
 - [ ] Stale or degraded data blocked from driving a privileged or irreversible decision.
-- [ ] Cancellation mid-flight: downstream work stops, resources released, committed state preserved.
+- [ ] Cancellation mid-flight: new work stops, cancellation propagates where supported, resources are released, and committed or unknown effects remain explicit.
 - [ ] Graceful shutdown during in-flight work: drained or checkpointed, leases released.
 - [ ] Worker lease expiry and redelivery: no duplicate effect, no lost message.
 - [ ] Poison message: dead-lettered, pipeline continues.
@@ -201,3 +208,13 @@ evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
 - [ ] Cache failure: treated as a miss where safe, never as an authorization bypass.
 - [ ] Logs and metrics from failure paths contain no secrets and no unbounded cardinality.
 - [ ] Secret canaries, encoded payloads, and sink-specific injection probes do not reach telemetry, syntax, privilege, or unintended resources.
+
+## Local Computation, UI, and Platform Boundaries
+
+- [ ] Are units, overflow, precision, rounding, NaN/infinity, empty values and complexity checked where they affect the contract?
+- [ ] Are resource and synchronization controls native to the actual process, device or deployment boundary, rather than copied from a distributed service?
+- [ ] Can stale UI callbacks overwrite newer state, and can cancellation occur after the server has committed? Are pending, failed and recovery states accessible and explicit?
+- [ ] Do offline replay and local persistence have bounded growth, conflict handling, privacy and loss/recovery semantics?
+- [ ] Are filesystem atomicity and crash durability checked against the actual platform instead of assumed from a rename?
+- [ ] Are physical safe-state transitions derived from approved hazard requirements, without bypassing security policy?
+- [ ] Are configuration, infrastructure drift, mixed-version deployment and rollback included when source code alone does not determine behavior?
