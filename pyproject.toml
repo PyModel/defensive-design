@@ -1,0 +1,18 @@
+# Maintainer tooling only. The installable skill lives in skills/defensive-design/.
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+src = ["scripts", "skills/defensive-design/references", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "UP", "ASYNC", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+explicit_package_bases = true
+mypy_path = "."
+warn_unused_ignores = true
+check_untyped_defs = true
+
+# The shipped example is the typed public surface; CI also runs
+# `mypy --strict skills/defensive-design/references` on it.

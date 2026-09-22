@@ -63,3 +63,18 @@ test-45,true,Review the robustness of a local ML pipeline. All jobs run on one m
 test-46,false,Correct spelling in this trusted README paragraph; no design review or code changes are needed.
 test-47,false,Rename a local variable in this pure test fixture. Preserve all behavior.
 test-48,true,Our application uses actors with exclusive ownership of state and communicates by messages. Review invariants without replacing actors with shared database locks.
+test-49,true,"Review this Go config loader used by several services: data, _ := os.ReadFile(path); _ = json.Unmarshal(data, &cfg); return cfg"
+test-50,true,Our public Rust crate exposes pub fn parse_port(s: &str) -> u16 { s.parse().unwrap() }. Callers pass user-supplied strings. Make it robust.
+test-51,true,In TypeScript we do const user = (await res.json()) as User; if (user.role === 'admin') grantAdmin(user.id). The response comes from a partner API. Is this safe?
+test-52,true,A Java repository method returns null both when the customer does not exist and when the database query throws. Callers treat null as 'create a new customer'. Review it.
+test-53,true,"Review this C packet handler: uint16_t len = read_u16(pkt); char buf[64]; memcpy(buf, pkt + 2, len); Do not edit yet."
+test-54,true,"This Python request handler enforces admin access with assert user.is_admin, 'forbidden' before deleting a project. Is that acceptable?"
+test-55,true,Single-threaded asyncio code: if account.balance >= amount: await ledger.record(amount); account.balance -= amount. Two coroutines can run this for the same account. Is it safe without threads?
+test-56,true,"Review this module interface before we build on it: create_order(user_id, product_id, qty, is_gift, is_paid, is_shipped, is_cancelled) with all flags independently settable."
+test-57,true,"Review this Kubernetes Deployment: no CPU/memory limits, liveness probe calls an endpoint that queries the database, and replicas restart during database outages."
+test-58,false,Add Go doc comments to these exported functions; do not change behavior.
+test-59,false,Reformat this Rust file to rustfmt style; no logic changes.
+test-60,false,Reorder the imports in this Java file alphabetically.
+test-61,false,"In two sentences, what is an idempotency key? No code or design review needed."
+test-62,false,Add type annotations to this trusted internal helper that formats a date for display; no behavior change.
+test-63,false,Update the copyright year in the LICENSE file.

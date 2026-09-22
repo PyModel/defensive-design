@@ -1,21 +1,14 @@
 # Verification, Signals, and Rollout
 
-Companion to `SKILL.md`. Use for Tier 2 and Tier 3 work: what to test, what to
-watch at runtime, and what gates a risky rollout or fault experiment.
+Companion to `SKILL.md`. Use when choosing failure-path tests, and for Tier 2 and
+Tier 3 work: what to watch at runtime and what gates a risky rollout or fault experiment.
 
 ## Evidence states
 
-Every verification claim carries one:
-
-| State | Meaning |
-|---|---|
-| `verified` | The check was actually executed, or authoritative runtime output was inspected |
-| `reasoned_not_run` | The behavior follows from code inspection; nothing was executed |
-| `blocked` | Verification was appropriate but unavailable — no environment, credentials, data, or tooling |
-| `not_applicable` | The failure surface or control does not exist in this design |
-
-Confidence is not evidence. A missing dependency makes a check `blocked`, never
-a pass. Never report a command's output that was not produced.
+Every verification claim carries one of the four states defined in `SKILL.md` step 5:
+`verified`, `reasoned_not_run`, `blocked`, or `not_applicable`. Confidence is not
+evidence. A missing dependency makes a check `blocked`, never a pass. Never report a
+command's output that was not produced.
 
 ## Verification matrix
 
@@ -26,6 +19,7 @@ arithmetic may need strong boundary/property tests without any distributed machi
 | Failure surface | Minimum check | Tier 2/3 check | Runtime evidence |
 |---|---|---|---|
 | Local computation | Boundary values, units, rounding, overflow, empty input | Properties, numerical error budget, measured complexity | Precise error/result contract; telemetry only if useful |
+| Type / module contract | Each reachable state and transition, rejected input classes, cleanup on every exit path | Exhaustiveness and type checks, sanitizers, deterministic interleavings across threads or awaits | Precise error/result contract; programmer errors fail loudly |
 | UI / offline state | Stale completion, lifecycle cancellation, explicit accessible status | Interrupted sync, conflict/replay, persisted queue bounds | Pending age, sync/recovery state without sensitive content |
 | Filesystem / device | Interrupted writes and owned-resource cleanup | Crash/power-loss or hardware tests against the platform contract | Recovery state and approved safety signals |
 | Input boundary | Invalid, missing, oversized, deeply nested, high-cardinality | Property or fuzz corpus, adversarial payloads | Reject counts by bounded reason class |
@@ -50,6 +44,40 @@ arithmetic may need strong boundary/property tests without any distributed machi
 Prefer deterministic clocks, injected randomness, controllable fakes, and
 synchronization primitives over sleeps. A test that passes by timing luck is not
 evidence.
+
+## Failure-path test catalogue
+
+Select only the cases whose surface exists. A check that could not run is `blocked`,
+never a pass.
+
+- [ ] Success with representative input, and valid absence returning an explicit no-data result.
+- [ ] Invalid, malformed, wrong-type, oversized, and excessively-nested input rejected with a stable error.
+- [ ] Unauthenticated and unauthorized requests denied, including on cache-hit, fallback, and replay paths.
+- [ ] Timeout on a dependency: expiry is correctly reported, cooperative completion is checked, and any required hard runtime bound is tested independently.
+- [ ] Transient failure followed by success: retried and resolved within the attempt and deadline budget.
+- [ ] Permanent failure: not retried, surfaced promptly.
+- [ ] An effectful operation described as a read: not retried unless its semantics and effect certainty make repetition safe.
+- [ ] Policy-enforcement dependency failure: authoritative security, abuse, cost, safety, or contractual limit remains enforced.
+- [ ] Retry budget exhausted: the correct terminal result, known committed effects preserved, and partial or unknown effects explicitly reconciled rather than assumed rolled back.
+- [ ] Duplicate request with the same idempotency key: one effect, consistent response.
+- [ ] Same key with different request semantics: conflict, not a silent replay.
+- [ ] Concurrent requests on the same key or resource: the invariant holds under real parallelism.
+- [ ] Ambiguous write outcome (timeout after the effect committed): resolved without duplicating the effect.
+- [ ] Crash or restart between claiming a key and committing: recovery leaves a consistent state.
+- [ ] Partial multi-item result: per-item status returned, failed items reconciled or compensated.
+- [ ] Fallback path exercised: security context preserved, result labelled degraded, not cached as ordinary success.
+- [ ] Stale or degraded data blocked from driving a privileged or irreversible decision.
+- [ ] Cancellation mid-flight: new work stops, cancellation propagates where supported, resources are released, and committed or unknown effects remain explicit.
+- [ ] Graceful shutdown during in-flight work: drained or checkpointed, leases released.
+- [ ] Worker lease expiry and redelivery: no duplicate effect, no lost message.
+- [ ] Poison message: dead-lettered, pipeline continues.
+- [ ] Bounds enforced: full queue, oversized payload, excessive fan-out, deep recursion, large result set.
+- [ ] Backpressure: overload produces deliberate rejection or shedding rather than collapse.
+- [ ] Stale work past its deadline or TTL is dropped, not processed at capacity cost.
+- [ ] Stale lease holder resumes after a new holder acquired the lease: its write is rejected by fence.
+- [ ] Cache failure: treated as a miss where safe, never as an authorization bypass.
+- [ ] Logs and metrics from failure paths contain no secrets and no unbounded cardinality.
+- [ ] Secret canaries, encoded payloads, and sink-specific injection probes do not reach telemetry, syntax, privilege, or unintended resources.
 
 ## Runtime signals that reveal amplification
 

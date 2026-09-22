@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede stale PR runs, but let every push to main finish its verification.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify-reference:
@@ -34,18 +35,31 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install reviewed test baseline
-        run: python -m pip install -r requirements-dev.txt
+      - name: Install hash-locked test baseline
+        run: |
+          python -m pip install --require-hashes -r requirements-dev.txt
+          python -m pip check
 
       - name: Validate the skill package
         run: python scripts/validate_skill.py
+
+      - name: Lint and type-check
+        run: |
+          python -m ruff check scripts skills tests
+          python -m mypy scripts tests
+          python -m mypy --strict skills/defensive-design/references
 
       - name: Run deterministic reference checks
         run: |
           python scripts/verify_reference.py
           python -m unittest discover -s tests -v
-          python -m compileall -q scripts references tests
-          git diff --check
+          python -m compileall -q scripts skills tests
+          # Compare against the empty tree: a clean checkout has no working-tree diff.
+          git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
+      - name: Mutation check of the reference controls
+        if: matrix.python-version == '3.11'
+        run: python scripts/mutation_check.py
 
       - name: Archive the checked source and environment
         if: matrix.python-version == '3.11'

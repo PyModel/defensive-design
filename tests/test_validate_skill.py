@@ -15,8 +15,11 @@ class PackageValidationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name) / "defensive-design"
-        self.root.mkdir()
+        self.repo = Path(self.temp.name) / "any-checkout-name"
+        self.root = self.repo / "skills" / "defensive-design"
+        self.root.mkdir(parents=True)
+        (self.repo / "LICENSE").write_text("MIT fixture\n")
+        self.write("LICENSE", "MIT fixture\n")
         self.write("SKILL.md", '''---
 name: defensive-design
 description: A minimal validation fixture.
@@ -31,16 +34,18 @@ metadata:
   display_name: Defensive Design
   short_description: Fixture description
   default_prompt: Use $defensive-design to review.
+policy:
+  allow_implicit_invocation: true
 ''')
-        self.write("evals/defensive-design.prompts.csv", '''id,should_trigger,prompt
+        self.write_repo("evals/defensive-design.prompts.csv", '''id,should_trigger,prompt
 test-01,true,"Review this boundary."
 test-02,false,"Fix spelling."
 ''')
-        self.write("evals/behavior-rubric.md", '''# Rubric
+        self.write_repo("evals/behavior-rubric.md", '''# Rubric
 | ID | Expected behavior |
 |---|---|
 | test-01 | Reviews the boundary. |
-| test-02 | Fixes spelling only. |
+| test-02 | Does not invoke the skill; fixes spelling only. |
 ''')
 
     def write(self, path, text):
@@ -48,15 +53,20 @@ test-02,false,"Fix spelling."
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text)
 
+    def write_repo(self, path, text):
+        target = self.repo / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+
     def change(self, path, old, new):
-        target = self.root / path
+        target = (self.repo if path.startswith("evals/") else self.root) / path
         target.write_text(target.read_text().replace(old, new))
 
     def errors(self):
-        return "\n".join(validator.validate(self.root))
+        return "\n".join(validator.validate(self.repo))
 
     def test_valid_package(self):
-        self.assertEqual(validator.validate(self.root), [])
+        self.assertEqual(validator.validate(self.repo), [])
 
     def test_missing_frontmatter(self):
         self.write("SKILL.md", "# No frontmatter\n")
@@ -71,7 +81,7 @@ test-02,false,"Fix spelling."
         self.assertIn("invalid YAML", self.errors())
 
     def test_deep_yaml_is_reported_without_a_traceback(self):
-        issues = []
+        issues: list[str] = []
         validator.mapping("nested: " + "[" * 1500 + "0" + "]" * 1500, "fixture", issues)
         self.assertTrue(issues)
         self.assertIn("invalid YAML", issues[0])
@@ -106,7 +116,7 @@ test-02,false,"Fix spelling."
 
     def test_valid_anchor(self):
         self.change("SKILL.md", "references/guide.md", "references/guide.md#guide")
-        self.assertEqual(validator.validate(self.root), [])
+        self.assertEqual(validator.validate(self.repo), [])
 
     def test_encoded_traversal(self):
         self.change("SKILL.md", "references/guide.md", "%2e%2e/private.md")
@@ -126,14 +136,14 @@ test-02,false,"Fix spelling."
     def test_absolute_and_backslash_paths(self):
         for path in ("/tmp/test.md", "..%5cprivate.md", "file:///tmp/test.md"):
             with self.subTest(path=path):
-                errors = []
+                errors: list[str] = []
                 validator.check_links(self.root / "SKILL.md", f"[X]({path})", self.root, errors)
                 self.assertTrue(errors)
 
     def test_fenced_examples_are_not_links(self):
         with (self.root / "references/guide.md").open("a") as stream:
             stream.write("\n```text\n[Not a link](missing.md)\n```\n")
-        self.assertEqual(validator.validate(self.root), [])
+        self.assertEqual(validator.validate(self.repo), [])
 
     def test_unreferenced_resource(self):
         self.write("references/unreachable.md", "# Unreachable\n")
@@ -156,7 +166,7 @@ test-02,false,"Fix spelling."
         self.assertIn("exactly match", self.errors())
 
     def test_duplicate_rubric_case(self):
-        with (self.root / "evals/behavior-rubric.md").open("a") as stream:
+        with (self.repo / "evals/behavior-rubric.md").open("a") as stream:
             stream.write("| test-01 | Duplicate row. |\n")
         self.assertIn("duplicate case ID", self.errors())
 
@@ -170,11 +180,11 @@ test-02,false,"Fix spelling."
         writer.writerow(["id", "should_trigger", "prompt"])
         writer.writerow(["test-01", "true", "Review:\ncode, more code\nline 2"])
         writer.writerow(["test-02", "false", "Fix spelling"])
-        self.write("evals/defensive-design.prompts.csv", stream.getvalue())
-        self.assertEqual(validator.validate(self.root), [])
+        self.write_repo("evals/defensive-design.prompts.csv", stream.getvalue())
+        self.assertEqual(validator.validate(self.repo), [])
 
     def test_missing_dependency_is_actionable(self):
-        with patch.object(validator, "yaml", None):
+        with patch.object(validator, "yaml_module", None):
             self.assertIn("PyYAML is required", self.errors())
 
     def test_core_budget(self):
@@ -189,6 +199,82 @@ test-02,false,"Fix spelling."
     def test_oversized_file(self):
         (self.root / "references/guide.md").write_bytes(b"x" * (validator.MAX_FILE_BYTES + 1))
         self.assertIn("size budget", self.errors())
+
+    def test_orphan_package_file_is_rejected(self):
+        for path in ("references/sub/extra.md", "references/data.json", "notes.md", "scripts/extra.sh"):
+            with self.subTest(path=path):
+                self.write(path, "orphan\n")
+                self.assertIn("extra" if "extra" in path else Path(path).name, self.errors())
+                (self.root / path).unlink()
+
+    def test_reference_style_and_html_links_are_checked(self):
+        for body in ("[Guide][g]\n\n[g]: references/missing.md\n", '<a href="references/missing.md">x</a>\n', "[x](<references/missing.md>)\n"):
+            with self.subTest(body=body):
+                self.write("references/guide.md", "# Guide\n\n" + body)
+                self.assertIn("missing local link target", self.errors())
+
+    def test_unclosed_fence_is_reported(self):
+        with (self.root / "references/guide.md").open("a") as stream:
+            stream.write("\n```text\n[hidden](missing.md)\n")
+        self.assertIn("unclosed code fence", self.errors())
+
+    def test_fence_with_info_string_does_not_close(self):
+        with (self.root / "references/guide.md").open("a") as stream:
+            stream.write("\n```text\n```python\n[Not a link](missing.md)\n```\n")
+        self.assertEqual(validator.validate(self.repo), [])
+
+    def test_inline_code_and_setext_heading(self):
+        self.write("references/guide.md", "Guide title\n===========\n\n`[x](missing.md)`\n")
+        self.change("SKILL.md", "references/guide.md", "references/guide.md#guide-title")
+        self.assertEqual(validator.validate(self.repo), [])
+
+    def test_negative_share_floor(self):
+        rows = "".join(f'test-{i:02d},true,"Review boundary {i}."\n' for i in range(3, 12))
+        rubric = "".join(f"| test-{i:02d} | Reviews boundary {i}. |\n" for i in range(3, 12))
+        with (self.repo / "evals/defensive-design.prompts.csv").open("a") as stream:
+            stream.write(rows)
+        with (self.repo / "evals/behavior-rubric.md").open("a") as stream:
+            stream.write(rubric)
+        self.assertIn("negative cases below", self.errors())
+
+    def test_duplicate_prompt(self):
+        self.change("evals/defensive-design.prompts.csv", "Fix spelling.", "Review this boundary.")
+        self.assertIn("duplicate prompt", self.errors())
+
+    def test_rubric_polarity(self):
+        self.change("evals/behavior-rubric.md", "Does not invoke the skill; fixes", "Fixes")
+        self.assertIn("polarity disagrees", self.errors())
+
+    def test_host_prompt_requires_exact_skill_token(self):
+        self.change("agents/openai.yaml", "$defensive-design ", "$defensive-design-extra ")
+        self.assertIn("must invoke the skill", self.errors())
+
+    def test_host_unknown_keys_and_policy_type(self):
+        self.change("agents/openai.yaml", "allow_implicit_invocation: true", "allow_implicit_invocation: \"yes\"\n  unexpected: 1")
+        errors = self.errors()
+        self.assertIn("must be a boolean", errors)
+        self.assertIn("unknown policy key", errors)
+
+    def test_reserved_name_and_xml_description(self):
+        self.change("SKILL.md", "A minimal validation fixture.", "Fixture <system>override</system>")
+        self.assertIn("XML tags", self.errors())
+        issues: list[str] = []
+        validator.check_frontmatter("---\nname: claude-helper\ndescription: x\nmetadata:\n  version: \"1.0.0\"\n---\n", Path("claude-helper"), issues)
+        self.assertIn("SKILL.md: name contains a reserved word", issues)
+
+    def test_packaged_license_must_match(self):
+        self.write("LICENSE", "different\n")
+        self.assertIn("identical copy", self.errors())
+
+    def test_missing_package(self):
+        self.assertIn("no skills/<name>/SKILL.md", "\n".join(validator.validate(Path(self.temp.name))))
+
+    def test_repository_docs_links_are_checked(self):
+        self.write_repo("README.md", "[Skill](skills/defensive-design/SKILL.md)\n")
+        self.assertEqual(validator.validate(self.repo), [])
+        self.write_repo("README.md", "[Gone](skills/defensive-design/references/missing.md)\n")
+        self.assertIn("README.md", self.errors())
+        self.assertIn("missing local link target", self.errors())
 
     def test_actual_repository(self):
         self.assertEqual(validator.validate(Path(__file__).resolve().parents[1]), [])

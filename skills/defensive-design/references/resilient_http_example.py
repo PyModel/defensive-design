@@ -22,9 +22,10 @@ import logging
 import math
 import random
 import time
-from collections.abc import Callable
+import unicodedata
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from email.utils import parsedate_to_datetime
 from enum import Enum
 from typing import Generic, TypeGuard, TypeVar
@@ -35,6 +36,9 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 RETRYABLE_HTTP_STATUSES = frozenset({502, 503, 504})
 MAX_RETRY_ATTEMPTS = 10
+# The profile schema is flat. Bound nesting explicitly: whether json.loads raises
+# RecursionError for deep input differs across CPython versions.
+MAX_JSON_DEPTH = 32
 
 
 def _validate_positive_finite(name: str, value: object) -> None:
@@ -55,6 +59,8 @@ class ResilienceConfig:
     telemetry_key: bytes = field(repr=False)
     expected_origin: str = field(repr=False)
     deadline_s: float = 5.0
+    # Total budget for one attempt: connect, send, response headers and body.
+    # httpx phase timeouts bound each socket operation; this bounds their sum.
     per_attempt_timeout_s: float = 2.0
     max_attempts: int = 3
     base_delay_s: float = 0.2
@@ -68,6 +74,8 @@ class ResilienceConfig:
     pool_timeout_s: float | None = None
     # A server may send an arbitrarily large or far-future Retry-After. Reject
     # automatic retry above this bound; never shorten the server's minimum.
+    # A hint that fits this bound but not the remaining deadline also stops
+    # retrying, and the hint is returned to the caller.
     max_retry_after_s: float = 30.0
 
     def __post_init__(self) -> None:
@@ -98,6 +106,15 @@ class ResilienceConfig:
 
         if self.base_delay_s > self.max_delay_s:
             raise ValueError("base_delay_s cannot exceed max_delay_s")
+        if self.per_attempt_timeout_s > self.deadline_s:
+            raise ValueError("per_attempt_timeout_s cannot exceed deadline_s")
+        if (
+            self.effective_connect_timeout_s > self.per_attempt_timeout_s
+            or self.effective_pool_timeout_s > self.per_attempt_timeout_s
+        ):
+            raise ValueError(
+                "connect_timeout_s and pool_timeout_s cannot exceed per_attempt_timeout_s"
+            )
 
         if not isinstance(self.telemetry_key, bytes) or len(self.telemetry_key) < 16:
             raise ValueError("telemetry_key must be at least 16 bytes")
@@ -306,6 +323,18 @@ class AsyncCircuitBreaker:
                 self._probing = False
                 self._generation += 1
 
+    async def abandon_probe(self, permit: int) -> None:
+        """Return an unused probe slot without charging the dependency.
+
+        Local saturation (for example, pool exhaustion) says nothing about the
+        dependency, so the existing cooldown is kept rather than restarted.
+        """
+        async with self._lock:
+            if permit == self._generation and self._state is CircuitState.HALF_OPEN:
+                self._state = CircuitState.OPEN
+                self._probing = False
+                self._generation += 1
+
     async def release_probe(self, permit: int) -> None:
         """Fence an unresolved probe and restart the open cooldown."""
         async with self._lock:
@@ -360,14 +389,15 @@ def _parse_retry_after(
         # `delay-seconds = 1*DIGIT`, ASCII only. int() alone is too permissive:
         # it accepts "+12", "1_2", and non-ASCII digits.
         #
-        # Bound the digit string before converting. float() of a long enough
-        # integer raises OverflowError, and int() itself refuses more than
+        # Bound the significant digits before converting. float() of a long
+        # enough integer raises OverflowError, and int() itself refuses more than
         # 4300 digits - either one would be an uncaught crash triggered by a
         # header we do not control. Anything this long is certainly past the
         # limit, so it is rejected without constructing an enormous integer.
-        if len(raw) > 18:
+        digits = raw.lstrip("0") or "0"
+        if len(digits) > 18:
             return _RetryAfterHint(exceeds_limit=True)
-        seconds = float(int(raw))
+        seconds = float(int(digits))
         if seconds > max_s:
             return _RetryAfterHint(exceeds_limit=True)
         return _RetryAfterHint(delay_s=seconds)
@@ -379,9 +409,9 @@ def _parse_retry_after(
     if when is None:
         return _RetryAfterHint()
     if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
+        when = when.replace(tzinfo=UTC)
     try:
-        current = datetime.now(timezone.utc) if now is None else now
+        current = datetime.now(UTC) if now is None else now
         seconds = (when - current).total_seconds()
     except (OverflowError, OSError, TypeError):
         return _RetryAfterHint()
@@ -394,13 +424,20 @@ def _parse_retry_after(
 
 
 def _parse_content_length(value: str | None) -> int | None:
+    """Return a declared length, or None when absent or not `1*DIGIT`.
+
+    None falls back to the bounded streaming read, so rejecting a malformed or
+    absurdly long value never weakens the size limit.
+    """
     if value is None:
         return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
+    raw = value.strip()
+    if not (raw.isascii() and raw.isdigit()):
         return None
-    return parsed if parsed >= 0 else None
+    digits = raw.lstrip("0") or "0"
+    if len(digits) > 18:
+        return None
+    return int(digits)
 
 
 async def _read_bounded_body(resp: httpx.Response, max_bytes: int) -> bytes | None:
@@ -432,10 +469,15 @@ def _object_without_duplicates(pairs: list[tuple[str, object]]) -> dict[str, obj
     return result
 
 
+_UNSAFE_TEXT_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+
 def _is_safe_text(value: object, max_chars: int) -> TypeGuard[str]:
     if not isinstance(value, str) or not (1 <= len(value) <= max_chars):
         return False
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+    # Controls, format characters (bidi overrides, zero-width), and line or
+    # paragraph separators can forge log lines or disguise displayed text.
+    if any(unicodedata.category(ch) in _UNSAFE_TEXT_CATEGORIES for ch in value):
         return False
     try:
         value.encode("utf-8")
@@ -468,14 +510,48 @@ def _canonicalize_domain(value: object) -> str | None:
     return ascii_domain
 
 
+def _json_depth_exceeds(text: str, limit: int) -> bool:
+    """Return True when array/object nesting outside strings exceeds `limit`."""
+    depth = 0
+    in_string = False
+    escaped = False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "[{":
+            depth += 1
+            if depth > limit:
+                return True
+        elif ch in "]}":
+            depth -= 1
+    return False
+
+
 def _parse_profile(body: bytes, user_id: str) -> FetchResult[UserProfile]:
     try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="MALFORMED_JSON"
+        )
+    if _json_depth_exceeds(text, MAX_JSON_DEPTH):
+        return FetchResult(
+            status=FetchStatus.INVALID_PAYLOAD, error_code="JSON_TOO_DEEP"
+        )
+    try:
         payload = json.loads(
-            body.decode("utf-8"),
+            text,
             parse_constant=_reject_json_constant,
             object_pairs_hook=_object_without_duplicates,
         )
-    except (UnicodeDecodeError, ValueError, RecursionError):
+    except (ValueError, RecursionError):
         return FetchResult(
             status=FetchStatus.INVALID_PAYLOAD, error_code="MALFORMED_JSON"
         )
@@ -515,6 +591,8 @@ async def fetch_user_profile(
     user_id: str,
     request_id: str,
     config: ResilienceConfig,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    uniform: Callable[[float, float], float] = random.uniform,
 ) -> FetchResult[UserProfile]:
     """Fetch a user profile under one cooperative operation deadline.
 
@@ -547,6 +625,9 @@ async def fetch_user_profile(
       loop, so a client built with `AsyncHTTPTransport(retries=N)` would
       multiply attempts by up to N + 1 - the nested-retry amplification the checklist
       warns about.
+
+    `sleep` and `uniform` are injectable so tests control backoff without
+    patching process-wide functions.
     """
 
     if client.follow_redirects:
@@ -562,8 +643,13 @@ async def fetch_user_profile(
     _validate_user_id(user_id)
     _validate_request_id(request_id)
 
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + config.deadline_s
+
     async def run() -> FetchResult[UserProfile]:
         anon_id = pseudonymize(user_id, config.telemetry_key)
+        last_error_code: str | None = None
+        last_retry_after: float | None = None
 
         for attempt in range(1, config.max_attempts + 1):
             permit = await breaker.allow()
@@ -572,9 +658,12 @@ async def fetch_user_profile(
                     "Circuit breaker rejected outbound user fetch",
                     extra={"request_id": request_id, "subject": anon_id},
                 )
+                # If our own failed attempts opened the breaker, report their
+                # cause and hint rather than masking them as CIRCUIT_OPEN.
                 return FetchResult(
                     status=FetchStatus.TEMPORARILY_UNAVAILABLE,
-                    error_code="CIRCUIT_OPEN",
+                    error_code=last_error_code or "CIRCUIT_OPEN",
+                    retry_after_s=last_retry_after,
                 )
 
             probe_resolved = False
@@ -582,7 +671,7 @@ async def fetch_user_profile(
             retry_after_hint: float | None = None
 
             try:
-                async with client.stream(
+                async with asyncio.timeout(config.per_attempt_timeout_s), client.stream(
                     "GET",
                     f"/users/{user_id}",
                     headers={"Accept-Encoding": "identity"},
@@ -631,7 +720,9 @@ async def fetch_user_profile(
                             )
                         body = await _read_bounded_body(resp, config.max_response_bytes)
                         if body is None:
-                            await breaker.record_success(permit)
+                            # Reachable but not healthy: garbage must not reset
+                            # the consecutive-failure count.
+                            await breaker.record_reachable(permit)
                             probe_resolved = True
                             return FetchResult(
                                 status=FetchStatus.INVALID_PAYLOAD,
@@ -639,12 +730,15 @@ async def fetch_user_profile(
                             )
 
                         result = _parse_profile(body, user_id)
-                        await breaker.record_success(permit)
+                        if result.status is FetchStatus.SUCCESS:
+                            await breaker.record_success(permit)
+                        else:
+                            await breaker.record_reachable(permit)
                         probe_resolved = True
                         return result
 
                     elif 201 <= status < 300:
-                        await breaker.record_success(permit)
+                        await breaker.record_reachable(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
@@ -652,7 +746,7 @@ async def fetch_user_profile(
                         )
 
                     elif 300 <= status < 400:
-                        await breaker.record_success(permit)
+                        await breaker.record_reachable(permit)
                         probe_resolved = True
                         return FetchResult(
                             status=FetchStatus.UNEXPECTED_RESPONSE,
@@ -742,14 +836,11 @@ async def fetch_user_profile(
                             error_code="UNEXPECTED_HTTP_STATUS",
                         )
 
-            except httpx.DecodingError:
-                await breaker.record_reachable(permit)
-                probe_resolved = True
-                return FetchResult(
-                    status=FetchStatus.INVALID_PAYLOAD,
-                    error_code="UNSUPPORTED_CONTENT_ENCODING",
-                )
             except httpx.PoolTimeout:
+                # Local saturation: free the probe slot without restarting the
+                # dependency's cooldown.
+                await breaker.abandon_probe(permit)
+                probe_resolved = True
                 return FetchResult(
                     status=FetchStatus.OVERLOADED,
                     error_code="LOCAL_POOL_TIMEOUT",
@@ -767,6 +858,14 @@ async def fetch_user_profile(
                     status=FetchStatus.UNEXPECTED_RESPONSE,
                     error_code="NON_RETRYABLE_REQUEST_ERROR",
                 )
+            except asyncio.CancelledError:
+                # Our own operation deadline expired mid-attempt: a hanging or
+                # slow-dripping dependency must still count against the breaker.
+                # Cancellation from the caller is not a dependency failure.
+                if not probe_resolved and loop.time() >= deadline:
+                    await breaker.record_failure(permit)
+                    probe_resolved = True
+                raise
             finally:
                 if not probe_resolved:
                     await breaker.release_probe(permit)
@@ -777,6 +876,9 @@ async def fetch_user_profile(
                     status=FetchStatus.INTERNAL_ERROR,
                     error_code="INTERNAL_RETRY_STATE_ERROR",
                 )
+
+            last_error_code = retry_error_code
+            last_retry_after = retry_after_hint
 
             if attempt == config.max_attempts:
                 logger.error(
@@ -797,10 +899,19 @@ async def fetch_user_profile(
             raw_delay = min(
                 config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1))
             )
-            jitter = random.uniform(0.0, raw_delay)
+            jitter = uniform(0.0, raw_delay)
             # Retry-After is a minimum, not an exact synchronized wake time.
-            # Positive jitter spreads clients; the outer deadline caps total wait.
-            await asyncio.sleep((retry_after_hint or 0.0) + jitter)
+            # Positive jitter spreads clients. A wait that cannot finish inside
+            # the deadline stops now and hands the hint to the caller instead of
+            # spending the rest of the budget asleep.
+            delay = (retry_after_hint or 0.0) + jitter
+            if loop.time() + delay >= deadline:
+                return FetchResult(
+                    status=FetchStatus.TEMPORARILY_UNAVAILABLE,
+                    error_code=retry_error_code,
+                    retry_after_s=retry_after_hint,
+                )
+            await sleep(delay)
 
         # Unreachable: every path above returns. Reaching here is an internal
         # invariant break, not a dependency problem.
@@ -809,8 +920,6 @@ async def fetch_user_profile(
             error_code="UNKNOWN_FAILURE",
         )
 
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + config.deadline_s
     try:
         async with asyncio.timeout_at(deadline):
             result = await run()

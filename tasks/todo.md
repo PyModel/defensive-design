@@ -1,4 +1,84 @@
-# Defensive Design 1.2.0 work ledger
+# Defensive Design 1.3.0 work ledger
+
+## Scope
+
+User request (2026-09-22): full critique plus architecture improvement, generalize to any
+code at any level, validate every coding reference against live sources, and apply the
+architecture candidates. Branch `improve/generalized-code-level-design` from `main@3fd605e`.
+No commit, push, release, deployment or host-wide installation was authorized.
+
+## Completed
+
+- [x] Critique of the whole package plus an independent code/CI audit. The audit found
+  0 P0/P1, 6 P2 and 15 P3 findings and 12 validator gaps. All are fixed except the
+  open items listed under Remaining.
+- [x] Code-level design reference, `contract_violation` cause, surface routing table.
+- [x] External links: all 31 checked return HTTP 200; OWASP ASVS (404) and the moved
+  OpenAI skills page were replaced. Language claims were checked against Python, Java,
+  C, .NET, Rust, Go, MDN and TypeScript documentation; the HTTPX TLS/connect claim was
+  checked against httpcore source.
+- [x] Layout: package moved to `skills/defensive-design/`. The decision was based on the
+  `skills` CLI source (commit 7407f38): its copy exclusions and its `skills/` discovery.
+  Jev `decide` p=0.99. Splitting the checklist was rejected (Jev p=0.97): it would exceed
+  the SKILL.md budget, create nested references and break a documented path.
+- [x] HTTP example fixes F1-F3, F8, F11-F17, with a regression for each.
+  `scripts/mutation_check.py` kills all 13 targeted mutants and runs in CI.
+- [x] Validator gaps V1-V11, the V12 license-copy check, the F7 folder-name half, F21,
+  and local-link checks for repository docs; 44 validator tests.
+- [x] CI: hash-locked universal baseline, Ruff and mypy, an empty-tree whitespace check,
+  and main runs no longer cancelled. Check names are unchanged.
+- [x] Evals: 63 cases (49 positive, 14 negative), rubric polarity normalized.
+
+## Remaining (explicit, not silently deferred)
+
+- `not_applicable`, V12 nesting-depth rule: the direct-link rule (every file under
+  `references/` or `assets/` is linked from `SKILL.md`) already enforces one level
+  deep.
+- Open, V12 token estimate: the 16 KiB byte budget stands in for a token count. A real
+  estimate needs a host-specific tokenizer, which would be a new dependency, so it was
+  not added.
+- Open, F7 import half: tests import `scripts.*` only when run from the repository root
+  (the documented command). Other working directories are unsupported and have no
+  bootstrap.
+
+## Verification evidence
+
+`verified` locally, 2026-09-22. Each interpreter used its own venv built from
+`pip install --require-hashes -r requirements-dev.txt`: Python 3.11.14, 3.12.0,
+3.13.11 and 3.14.7. On all four, the following passed: `validate_skill.py`,
+`verify_reference.py` (56 checks), unittest (48 tests), `mutation_check.py` (13/13
+killed), Ruff, mypy, strict mypy on the example, compileall, and `pip check`. The HTTPX
+0.27.0 compatibility run passed on 3.11. An empty-tree `git diff --check` passed, and
+all 31 external links returned 200.
+
+`jev_gate` escalated twice. The first gate verified 7/7 fix claims, with patch review
+safe_to_apply 0.57. The second contradicted an incomplete compatibility claim, which is
+now corrected in CHANGELOG, and scored safe_to_apply 0.61. The review score stayed
+below the auto threshold (0.8).
+
+
+The local results live in the final report. The hosted CI result belongs in the PR
+record once the branch is pushed; it is not claimed here.
+
+- `verified` sample behavior: one fresh Claude Opus subagent (this host, 2026-09-22)
+  ran cases 50, 51, 54, 55 and 59 without access to `evals/`. It matched all 5
+  rubric rows. This is a 5-case sample, not a corpus pass.
+- `blocked`: full 63-case corpus runs across hosts and models.
+- `verified` installer behavior: `npx skills@latest add <repo> --list` found exactly one
+  skill. A real global install into a throwaway HOME (`-a claude-code`) copied only the
+  12 package files, with no `evals/`, `tests/`, `tasks/` or CI.
+- `reasoned_not_run`: other hosts' manual copy conventions.
+
+## Rollback
+
+Revert the branch commits or reinstall the 1.2.0 package. Package-relative paths are
+unchanged, so installed copies need no migration.
+
+---
+
+## Historical 1.2.0 record (not current task instructions or new evidence)
+
+### Defensive Design 1.2.0 work ledger
 
 ## Scope
 

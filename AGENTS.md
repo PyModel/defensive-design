@@ -6,17 +6,24 @@ references on demand. Do not add infrastructure merely to exemplify a design pat
 
 ## Structure and compatibility
 
-- `SKILL.md`: trigger, workflow, invariants, routing, version metadata.
-- `references/`: optional reasoning adapters and the illustrative HTTP example.
-- `assets/`: optional assessment template; no required output bureaucracy.
-- `evals/`: trigger cases, observable behavior rubric and evaluation procedure.
-- `scripts/` and `tests/`: package and reference checks, not agent evaluation results.
-- `agents/`: optional provider adapter; the core must not depend on it.
+Only `skills/defensive-design/` is installed; installers copy that whole directory.
+
+- `skills/defensive-design/SKILL.md`: trigger, workflow, invariants, routing, version.
+- `skills/defensive-design/references/`: on-demand reasoning adapters and the HTTP example.
+- `skills/defensive-design/assets/`: optional assessment template.
+- `skills/defensive-design/agents/`: optional host adapter; the core must not depend on it.
+- `skills/defensive-design/LICENSE`: identical copy of the root LICENSE.
+- `evals/`: trigger cases, behavior rubric and evaluation procedure. Never package them;
+  a rubric installed next to the skill contaminates behavioral evaluation.
+- `scripts/`, `tests/`, `pyproject.toml`, `requirements-dev.*`: maintainer checks.
 - `tasks/todo.md`: current work evidence and clearly separated historical records.
 
+Every packaged file must be reachable from `SKILL.md`; the validator rejects orphans.
+
 Preserve the public skill name, supported reference paths and example result types
-unless a documented migration justifies a break. Keep dependency pins and CI action
-pins reviewed. Preserve the existing protected-branch check names.
+unless a documented migration justifies a break. Regenerate hash-locked dependencies
+from `requirements-dev.in` with the command in that file, keep CI action pins reviewed,
+and preserve the existing protected-branch check names.
 
 ## Change discipline
 
@@ -32,13 +39,17 @@ structure change. Historical verification records are not evidence for new revis
 
 ## Verification
 
-In a reviewed Python 3.11+ environment with `requirements-dev.txt` installed:
+In a Python 3.11+ environment with `pip install --require-hashes -r requirements-dev.txt`:
 
 ```bash
 python scripts/validate_skill.py
 python scripts/verify_reference.py
 python -m unittest discover -s tests -v
-python -m compileall -q scripts references tests
+python scripts/mutation_check.py
+python -m ruff check scripts skills tests
+python -m mypy scripts tests
+python -m mypy --strict skills/defensive-design/references
+python -m compileall -q scripts skills tests
 git diff --check
 ```
 

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Self-contained regression checks for references/resilient_http_example.py."""
+"""Self-contained regression checks for the packaged resilient_http_example.py."""
 
 from __future__ import annotations
 
 import asyncio
 import gzip
 import importlib.util
+import inspect
 import json
 import logging
 import pathlib
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from email.utils import format_datetime
 
 import httpx
@@ -19,7 +20,7 @@ if not __debug__:
     raise RuntimeError("verify_reference.py requires assertions; do not run with -O")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "references" / "resilient_http_example.py"
+MODULE_PATH = ROOT / "skills" / "defensive-design" / "references" / "resilient_http_example.py"
 spec = importlib.util.spec_from_file_location("resilient_http_example", MODULE_PATH)
 assert spec is not None and spec.loader is not None
 mod = importlib.util.module_from_spec(spec)
@@ -35,6 +36,20 @@ class AsyncBytes(httpx.AsyncByteStream):
 
     async def __aiter__(self):
         yield self.content
+
+
+class ChunkedBytes(httpx.AsyncByteStream):
+    """Unread streaming body with no Content-Length, optionally dripped slowly."""
+
+    def __init__(self, chunks: list[bytes], delay_s: float = 0.0):
+        self.chunks = chunks
+        self.delay_s = delay_s
+
+    async def __aiter__(self):
+        for chunk in self.chunks:
+            if self.delay_s:
+                await asyncio.sleep(self.delay_s)
+            yield chunk
 
 
 def cfg(**overrides):
@@ -59,6 +74,7 @@ async def run_fetch(
     breaker=None,
     user_id="abc-123_x.y~z",
     base_url="https://example.test",
+    **fetch_kwargs,
 ):
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(base_url=base_url, transport=transport) as client:
@@ -69,6 +85,7 @@ async def run_fetch(
             user_id=user_id,
             request_id="req-1",
             config=config or cfg(),
+            **fetch_kwargs,
         )
 
 
@@ -100,7 +117,8 @@ async def test_email_domain_is_canonicalized_without_unicode_aliases():
     assert result.data is not None
     assert result.data.email_domain == "example.com"
 
-    for supplied in ("example。com", "faß.de", "ｅxample.com"):
+    # Deliberate confusables: ideographic full stop and a fullwidth letter.
+    for supplied in ("example。com", "faß.de", "ｅxample.com"):  # noqa: RUF001
 
         async def handler(request, domain=supplied):
             return httpx.Response(
@@ -219,7 +237,8 @@ async def test_5xx_opens_breaker_without_content_length_override():
     assert breaker.state is mod.CircuitState.OPEN
     assert breaker.failure_count == 2
     assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
-    assert result.error_code == "CIRCUIT_OPEN"
+    # The breaker opened because of this call's own failures; report their cause.
+    assert result.error_code == "UPSTREAM_TRANSIENT_5XX", result.error_code
 
 
 async def test_transient_failure_then_success_resets_breaker():
@@ -360,15 +379,24 @@ async def test_malformed_content_length_does_not_escape():
 
 
 async def test_deep_json_is_typed_failure():
-    # Deep enough to trigger RecursionError on typical CPython builds, while small in bytes.
-    body = ("[" * 2000 + "0" + "]" * 2000).encode()
+    # CPython 3.14 parses this without RecursionError; the explicit bound must not
+    # depend on interpreter recursion behavior.
+    depth = mod.MAX_JSON_DEPTH + 1
+    body = ("[" * depth + "0" + "]" * depth).encode()
 
     async def handler(request):
         return httpx.Response(200, content=body)
 
     result = await run_fetch(handler, config=cfg(max_response_bytes=len(body) + 10))
     assert result.status is mod.FetchStatus.INVALID_PAYLOAD
-    assert result.error_code in {"MALFORMED_JSON", "SCHEMA_VIOLATION"}
+    assert result.error_code == "JSON_TOO_DEEP", result.error_code
+
+
+def test_json_depth_scan_ignores_brackets_inside_strings():
+    limit = 2
+    assert not mod._json_depth_exceeds('{"a": "[[[[{{{{"}', limit)
+    assert not mod._json_depth_exceeds('{"a": "\\"[[[["}', limit)
+    assert mod._json_depth_exceeds('{"a": [{"b": 1}]}', limit)
 
 
 async def test_unsafe_json_forms_are_typed_failures():
@@ -413,7 +441,7 @@ async def test_operation_deadline_is_hard():
         raise AssertionError("unreachable")
 
     result = await run_fetch(
-        handler, config=cfg(deadline_s=0.001, per_attempt_timeout_s=1.0)
+        handler, config=cfg(deadline_s=0.01, per_attempt_timeout_s=0.01)
     )
     assert result.status is mod.FetchStatus.CANCELLED
     assert result.error_code == "DEADLINE_EXCEEDED"
@@ -452,10 +480,12 @@ async def test_half_open_reachable_response_resolves_probe():
     now[0] = 1.0
 
     async def handler(request):
-        return httpx.Response(400)
+        # 409 is classified breaker-neutral (record_reachable), not healthy.
+        return httpx.Response(409)
 
     result = await run_fetch(handler, breaker=breaker)
-    assert result.status is mod.FetchStatus.INVALID_REQUEST
+    assert result.status is mod.FetchStatus.UNEXPECTED_RESPONSE
+    assert result.error_code == "UNEXPECTED_CLIENT_STATUS"
     assert breaker.state is mod.CircuitState.CLOSED
     assert breaker.probing is False
 
@@ -710,7 +740,7 @@ def test_retry_after_parsing():
     over = parse("900", 30)
     assert over.delay_s is None and over.exceeds_limit
     # HTTP-date, both directions, under a fixed clock.
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     future = parse(
         format_datetime(now + timedelta(seconds=45), usegmt=True), 300, now=now
     )
@@ -772,19 +802,13 @@ async def test_retry_after_is_honored_over_jitter():
         jitter_ranges.append((low, high))
         return high
 
-    real_sleep = mod.asyncio.sleep
-    real_uniform = mod.random.uniform
-    mod.asyncio.sleep = capture_sleep
-    mod.random.uniform = max_jitter
-    try:
-        result = await run_fetch(
-            handler,
-            breaker=breaker,
-            config=cfg(deadline_s=4.0, max_retry_after_s=2.0),
-        )
-    finally:
-        mod.asyncio.sleep = real_sleep
-        mod.random.uniform = real_uniform
+    result = await run_fetch(
+        handler,
+        breaker=breaker,
+        config=cfg(deadline_s=4.0, max_retry_after_s=2.0),
+        sleep=capture_sleep,
+        uniform=max_jitter,
+    )
 
     assert calls == 3, calls
     assert result.retry_after_s == 1.0, result.retry_after_s
@@ -827,19 +851,25 @@ async def test_module_logger_uses_pseudonymous_subjects():
 
 def test_attempt_timeout_bounds_each_phase_separately():
     timeout = cfg(
-        per_attempt_timeout_s=5.0, connect_timeout_s=1.0, pool_timeout_s=0.5
+        deadline_s=10.0,
+        per_attempt_timeout_s=5.0,
+        connect_timeout_s=1.0,
+        pool_timeout_s=0.5,
     ).attempt_timeout()
     assert (timeout.connect, timeout.pool) == (1.0, 0.5)
     assert (timeout.read, timeout.write) == (5.0, 5.0)
     # Defaults fall back to the per-attempt value.
-    fallback = cfg(per_attempt_timeout_s=3.0).attempt_timeout()
+    fallback = cfg(deadline_s=10.0, per_attempt_timeout_s=3.0).attempt_timeout()
     assert (fallback.connect, fallback.read, fallback.write, fallback.pool) == (
         3.0,
     ) * 4
 
 
 def test_config_rejects_pathological_values():
-    bad = [
+    bad: list[dict[str, object]] = [
+        {"deadline_s": 1.0, "per_attempt_timeout_s": 2.0},
+        {"per_attempt_timeout_s": 0.25, "connect_timeout_s": 0.5},
+        {"per_attempt_timeout_s": 0.25, "pool_timeout_s": 0.5},
         {"deadline_s": float("nan")},
         {"base_delay_s": float("inf")},
         {"max_attempts": 1.5},
@@ -859,7 +889,7 @@ def test_config_rejects_pathological_values():
             continue
         raise AssertionError(f"expected validation error for {override!r}")
 
-    breaker_bad = (
+    breaker_bad: tuple[dict[str, object], ...] = (
         {"failure_threshold": True},
         {"reset_timeout_s": 10**10_000},
         {"clock": None},
@@ -885,61 +915,214 @@ def test_config_repr_redacts_sensitive_fields():
     assert "example.test" not in rendered, rendered
 
 
+async def test_retry_after_beyond_remaining_deadline_returns_hint():
+    calls = 0
+
+    async def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, headers={"retry-after": "1"})
+
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    result = await run_fetch(handler, config=cfg(deadline_s=0.3))
+    assert calls == 1, calls
+    assert loop.time() - started < 0.3
+    assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+    assert result.error_code == "UPSTREAM_TRANSIENT_5XX", result.error_code
+    assert result.retry_after_s == 1.0, result.retry_after_s
+
+
+async def test_slow_drip_body_is_bounded_per_attempt():
+    calls = 0
+
+    async def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, stream=ChunkedBytes([b" "] * 50, delay_s=0.01))
+
+    result = await run_fetch(
+        handler,
+        config=cfg(deadline_s=1.0, per_attempt_timeout_s=0.05, max_attempts=2),
+        breaker=mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=1.0),
+    )
+    assert calls == 2, calls
+    assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+    assert result.error_code == "UPSTREAM_TIMEOUT", result.error_code
+
+
+async def test_deadline_cut_attempt_counts_as_breaker_failure():
+    never = asyncio.Event()
+
+    async def handler(request):
+        await never.wait()
+        raise AssertionError("unreachable")
+
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=1.0)
+    result = await run_fetch(
+        handler,
+        config=cfg(deadline_s=0.05, per_attempt_timeout_s=0.05),
+        breaker=breaker,
+    )
+    assert result.status is mod.FetchStatus.CANCELLED
+    assert breaker.failure_count == 1, breaker.failure_count
+
+
+async def test_caller_cancellation_releases_probe_without_failure():
+    now = [0.0]
+    breaker = mod.AsyncCircuitBreaker(
+        failure_threshold=1, reset_timeout_s=1.0, clock=lambda: now[0]
+    )
+    initial = await breaker.allow()
+    assert initial is not None
+    await breaker.record_failure(initial)
+    now[0] = 1.0
+    started = asyncio.Event()
+    never = asyncio.Event()
+
+    async def handler(request):
+        started.set()
+        await never.wait()
+        raise AssertionError("unreachable")
+
+    task = asyncio.create_task(run_fetch(handler, breaker=breaker))
+    await started.wait()
+    assert breaker.probing is True
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    else:
+        raise AssertionError("caller cancellation was swallowed")
+    assert breaker.state is mod.CircuitState.OPEN
+    assert breaker.probing is False
+    assert breaker.failure_count == 1, breaker.failure_count
+
+
+async def test_chunked_body_over_limit_is_bounded_while_streaming():
+    async def handler(request):
+        return httpx.Response(200, stream=ChunkedBytes([b"x" * 100] * 5))
+
+    result = await run_fetch(handler, config=cfg(max_response_bytes=128))
+    assert result.status is mod.FetchStatus.INVALID_PAYLOAD
+    assert result.error_code == "RESPONSE_TOO_LARGE"
+
+
+async def test_transport_errors_are_retried_and_counted():
+    for error in (httpx.ConnectError, httpx.ReadTimeout):
+        calls = 0
+
+        async def handler(request, error=error):
+            nonlocal calls
+            calls += 1
+            raise error("simulated", request=request)
+
+        breaker = mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=1.0)
+        result = await run_fetch(handler, breaker=breaker)
+        assert calls == 3, (error, calls)
+        assert breaker.failure_count == 3, (error, breaker.failure_count)
+        assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+        expected = "UPSTREAM_TIMEOUT" if error is httpx.ReadTimeout else "TRANSPORT_ERROR"
+        assert result.error_code == expected, (error, result.error_code)
+
+
+async def test_request_carries_configured_phase_timeouts():
+    observed = {}
+
+    async def handler(request):
+        observed.update(request.extensions["timeout"])
+        return httpx.Response(200, json={"display_name": "Alice"})
+
+    config = cfg(per_attempt_timeout_s=0.25, connect_timeout_s=0.1, pool_timeout_s=0.05)
+    result = await run_fetch(handler, config=config)
+    assert result.status is mod.FetchStatus.SUCCESS
+    assert observed == {"connect": 0.1, "read": 0.25, "write": 0.25, "pool": 0.05}, observed
+
+
+async def test_pool_timeout_during_probe_keeps_cooldown():
+    now = [0.0]
+    breaker = mod.AsyncCircuitBreaker(
+        failure_threshold=1, reset_timeout_s=1.0, clock=lambda: now[0]
+    )
+    initial = await breaker.allow()
+    assert initial is not None
+    await breaker.record_failure(initial)
+    now[0] = 1.0
+
+    async def handler(request):
+        raise httpx.PoolTimeout("simulated", request=request)
+
+    result = await run_fetch(handler, breaker=breaker)
+    assert result.status is mod.FetchStatus.OVERLOADED
+    assert breaker.state is mod.CircuitState.OPEN
+    assert breaker.probing is False
+    # The dependency's cooldown was not restarted by our own saturation.
+    assert await breaker.allow() is not None
+
+
+async def test_invalid_payload_does_not_reset_failure_count():
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=1.0)
+    permit = await breaker.allow()
+    assert permit is not None
+    await breaker.record_failure(permit)
+
+    for response in (
+        httpx.Response(200, content=b"not json"),
+        httpx.Response(200, content=b"x" * 2048),
+        httpx.Response(302),
+        httpx.Response(204),
+    ):
+
+        async def handler(request, response=response):
+            return response
+
+        await run_fetch(handler, breaker=breaker, config=cfg(max_response_bytes=128))
+        assert breaker.failure_count == 1, (response.status_code, breaker.failure_count)
+
+
+async def test_breaker_opened_mid_retry_reports_cause():
+    async def handler(request):
+        return httpx.Response(503, headers={"retry-after": "0"})
+
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=2, reset_timeout_s=10.0)
+    result = await run_fetch(handler, breaker=breaker)
+    assert breaker.state is mod.CircuitState.OPEN
+    assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
+    assert result.error_code == "UPSTREAM_TRANSIENT_5XX", result.error_code
+    assert result.retry_after_s == 0.0, result.retry_after_s
+
+
+def test_numeric_headers_are_strict():
+    hint = mod._parse_retry_after("0" * 20 + "1", 30.0)
+    assert hint == mod._RetryAfterHint(delay_s=1.0), hint
+    for raw in ("1_0", "+5", "-1", "\uff15", "1e3", "0x10", "", "9" * 40):
+        assert mod._parse_content_length(raw) is None, raw
+    assert mod._parse_content_length(" 007 ") == 7
+    assert mod._parse_content_length("0") == 0
+
+
+def test_display_text_rejects_invisible_and_separator_characters():
+    for ch in ("\u202e", "\u0085", "\u2028", "\u2029", "\u200b", "\x7f", "\n"):
+        assert not mod._is_safe_text(f"Al{ch}ice", 100), repr(ch)
+    assert mod._is_safe_text("Alice Ångström", 100)
+
+
 async def main():
-    sync_tests = [
-        test_config_rejects_pathological_values,
-        test_retry_after_parsing,
-        test_attempt_timeout_bounds_each_phase_separately,
-        test_terminal_status_values_are_unique,
-        test_config_repr_redacts_sensitive_fields,
-    ]
-    for test in sync_tests:
-        test()
-        print(f"PASS {test.__name__}")
+    # Collect every test_* function in definition order so a new check cannot be
+    # silently skipped by a hand-maintained list.
     tests = [
-        test_success_with_contract_safe_path_segment,
-        test_email_domain_is_canonicalized_without_unicode_aliases,
-        test_missing_email_domain_preserves_absence,
-        test_dot_segments_are_rejected_before_io,
-        test_encoded_separator_candidates_are_rejected_before_io,
-        test_non_utf8_user_id_is_rejected_before_io,
-        test_log_correlation_id_rejects_control_characters,
-        test_5xx_opens_breaker_without_content_length_override,
-        test_transient_failure_then_success_resets_breaker,
-        test_permanent_5xx_is_not_retried,
-        test_malformed_content_encoding_is_rejected_before_decoding,
-        test_compressed_body_is_rejected_before_expansion,
-        test_pool_timeout_is_shed_not_retried,
-        test_protocol_errors_are_not_retried_without_a_contract,
-        test_unexpected_201_is_not_5xx,
-        test_oversized_200_is_bounded,
-        test_malformed_content_length_does_not_escape,
-        test_deep_json_is_typed_failure,
-        test_unsafe_json_forms_are_typed_failures,
-        test_invalid_unicode_output_is_rejected,
-        test_operation_deadline_is_hard,
-        test_caller_cancellation_propagates,
-        test_half_open_reachable_response_resolves_probe,
-        test_http_statuses_map_to_expected_results,
-        test_408_is_retried_not_reported_as_invalid,
-        test_neutral_outcomes_do_not_reset_failure_count,
-        test_contract_valid_results_reset_failure_count,
-        test_neutral_response_during_probe_closes_breaker,
-        test_stale_probe_result_is_fenced,
-        test_breaker_recovery_uses_injected_clock,
-        test_redirect_following_client_is_rejected,
-        test_client_hooks_are_rejected_before_io,
-        test_untrusted_dependency_origin_is_rejected_before_io,
-        test_429_surfaces_bounded_retry_after,
-        test_retry_after_above_budget_is_not_shortened,
-        test_retry_after_above_budget_stops_automatic_retry,
-        test_retry_after_is_honored_over_jitter,
-        test_module_logger_uses_pseudonymous_subjects,
+        value
+        for name, value in globals().items()
+        if name.startswith("test_") and callable(value)
     ]
     for test in tests:
-        await test()
+        if inspect.iscoroutinefunction(test):
+            await test()
+        else:
+            test()
         print(f"PASS {test.__name__}")
-    print(f"PASS {len(tests) + len(sync_tests)} checks total")
+    print(f"PASS {len(tests)} checks total")
 
 
 if __name__ == "__main__":

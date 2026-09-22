@@ -140,7 +140,7 @@ Use current primary guidance as a control source, not as a substitute for the ac
 system contract:
 
 - [NIST Secure Software Development Framework 1.1](https://csrc.nist.gov/pubs/sp/800/218/final) for threat modeling, secure coding, code analysis, components, secure defaults, and vulnerability response.
-- [OWASP ASVS 5.0](https://owasp.org/www-project-application-security-verification-standard/) for verifiable application-security requirements.
+- [OWASP ASVS 5.0](https://owasp.org/projects/asvs) for verifiable application-security requirements.
 - [CISA Secure by Design](https://www.cisa.gov/securebydesign) for secure defaults and shifting preventable security burden away from users.
 
 Select the relevant requirements. Do not dump an entire external checklist into a small

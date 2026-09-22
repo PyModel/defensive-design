@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Validate this skill package offline; not a model or general Markdown validator."""
+"""Validate this repository's skill packages offline; not a model or general Markdown validator.
+
+Layout: every `skills/<name>/SKILL.md` is an installable package. Maintainer material
+(`evals/`, `scripts/`, `tests/`, `tasks/`) lives at the repository root and is never
+installed. Checks follow the Agent Skills specification plus documented host rules.
+"""
 from __future__ import annotations
 
 import argparse
@@ -7,27 +12,53 @@ import csv
 import io
 import re
 import sys
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from types import ModuleType
+
+yaml_module: ModuleType | None
 try:
     import yaml
-except ImportError:
-    yaml = None
+
+    yaml_module = yaml
+except ImportError:  # Reported as an actionable validation error, not a traceback.
+    yaml_module = None
 
 MAX_FILE_BYTES = 256 * 1024
-MAX_MARKDOWN_FILES = 128
+MAX_PACKAGE_FILES = 128
 MAX_CORE_BYTES = 16 * 1024  # Project budget, not an Agent Skills specification limit.
 MAX_CORE_LINES = 500
+MIN_NEGATIVE_SHARE = 0.2  # Project floor so trigger precision stays measurable.
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+RESERVED_NAME_WORDS = ("anthropic", "claude")  # Claude platform rule.
+XML_TAG = re.compile(r"<\s*/?\s*[A-Za-z][\w:.-]*(?:\s[^<>]*)?/?\s*>")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\Z")
 CASE = re.compile(r"test-[0-9]+\Z")
-LINK = re.compile(r"!?\[[^\]\n]*\]\(([^\s)]+)\)")
+INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\(\s*(<[^>\n]*>|[^\s)]+)(?:\s+\"[^\"\n]*\")?\s*\)")
+REFERENCE_DEFINITION = re.compile(r"^\s{0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|\S+)", re.MULTILINE)
+HTML_LINK = re.compile(r"""\b(?:href|src)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
 RUBRIC_ID = re.compile(r"^\|\s*(test-[0-9]+)\s*\|\s*(.+?)\s*\|\s*$", re.MULTILINE)
+NEGATIVE_RUBRIC_PREFIX = "Does not invoke the skill"
+# Files a host reads without a Markdown link from SKILL.md.
+UNLINKED_PACKAGE_FILES = {"SKILL.md", "LICENSE", "agents/openai.yaml"}
+HOST_KEYS = {
+    "interface": {
+        "display_name",
+        "short_description",
+        "icon_small",
+        "icon_large",
+        "brand_color",
+        "default_prompt",
+    },
+    "policy": {"allow_implicit_invocation"},
+    "dependencies": {"tools"},
+}
 
 
-if yaml is not None:
+if yaml_module is not None:
     class UniqueSafeLoader(yaml.SafeLoader):
         """Safe YAML types with duplicate mapping keys rejected, not overwritten."""
 
@@ -42,6 +73,13 @@ if yaml is not None:
             return result
 
 
+def label(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.name
+
+
 def read_text(path: Path, root: Path, issues: list[str]) -> str | None:
     try:
         resolved = path.resolve()
@@ -53,12 +91,12 @@ def read_text(path: Path, root: Path, issues: list[str]) -> str | None:
             raise ValueError("file exceeds validation size budget")
         return raw.decode("utf-8")
     except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
-        issues.append(f"{path.name}: {exc}")
+        issues.append(f"{label(path, root)}: {exc}")
         return None
 
 
-def mapping(text: str, label: str, issues: list[str]) -> dict:
-    if yaml is None:
+def mapping(text: str, name: str, issues: list[str]) -> dict:
+    if yaml_module is None:
         issues.append("PyYAML is required; install the reviewed requirements-dev.txt")
         return {}
     try:
@@ -67,46 +105,65 @@ def mapping(text: str, label: str, issues: list[str]) -> dict:
             raise ValueError("expected a YAML mapping")
         return value
     except (yaml.YAMLError, ValueError, TypeError, RecursionError) as exc:
-        issues.append(f"{label}: invalid YAML: {exc}")
+        issues.append(f"{name}: invalid YAML: {exc}")
         return {}
 
 
-def prose(text: str) -> str:
-    """Ignore fenced examples when checking this repo's inline links and headings."""
+def prose(text: str, issues: list[str] | None = None, name: str = "") -> str:
+    """Blank fenced blocks and inline code so examples are not parsed as links."""
     lines = []
     fence = None
     for line in text.splitlines():
-        match = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+        match = re.match(r"^\s{0,3}(`{3,}|~{3,})(.*)$", line)
         if match:
-            marker = match.group(1)
+            marker, rest = match.groups()
             if fence is None:
                 fence = marker
-            elif marker[0] == fence[0] and len(marker) >= len(fence):
-                fence = None
+            elif marker[0] == fence[0] and len(marker) >= len(fence) and not rest.strip():
+                fence = None  # A closing fence carries no info string.
             lines.append("")
         elif fence is None:
-            lines.append(line)
+            lines.append(CODE_SPAN.sub("", line))
+        else:
+            lines.append("")
+    if fence is not None and issues is not None:
+        issues.append(f"{name}: unclosed code fence hides the rest of the file")
     return "\n".join(lines)
 
 
 def anchors(text: str) -> set[str]:
-    """GitHub-style slugs for this repository's plain ATX headings."""
+    """GitHub-style slugs for ATX and setext headings."""
     result = set()
     counts: Counter[str] = Counter()
-    for line in prose(text).splitlines():
-        match = re.match(r"^#{1,6}\s+(.+?)\s*#*\s*$", line)
-        if not match:
+    lines = prose(text).splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        heading = match.group(1) if match else None
+        if (
+            heading is None
+            and index + 1 < len(lines)
+            and line.strip()
+            and re.fullmatch(r"\s{0,3}(=+|-+)\s*", lines[index + 1])
+        ):
+            heading = line.strip()
+        if heading is None:
             continue
-        slug = re.sub(r"[^\w\- ]", "", match.group(1).lower()).replace(" ", "-")
+        slug = re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
         suffix = f"-{counts[slug]}" if counts[slug] else ""
         counts[slug] += 1
         result.add(slug + suffix)
     return result
 
 
+def link_targets(text: str, issues: list[str] | None = None, name: str = "") -> list[str]:
+    body = prose(text, issues, name)
+    raw = INLINE_LINK.findall(body) + REFERENCE_DEFINITION.findall(body) + HTML_LINK.findall(body)
+    return [value[1:-1] if value.startswith("<") and value.endswith(">") else value for value in raw]
+
+
 def check_links(path: Path, text: str, root: Path, issues: list[str]) -> set[Path]:
     targets = set()
-    for raw in LINK.findall(prose(text)):
+    for raw in link_targets(text, issues, label(path, root)):
         try:
             url = urlsplit(raw)
             if url.scheme in {"https", "http", "mailto"}:
@@ -129,36 +186,33 @@ def check_links(path: Path, text: str, root: Path, issues: list[str]) -> set[Pat
                 if body is not None and unquote(url.fragment) not in anchors(body):
                     raise ValueError("missing local heading anchor")
         except (OSError, ValueError, UnicodeError, RuntimeError) as exc:
-            issues.append(f"{path.relative_to(root)}: {raw!r}: {exc}")
+            issues.append(f"{label(path, root)}: {raw!r}: {exc}")
     return targets
 
 
-def validate(root: Path) -> list[str]:
-    """Return errors without executing examples, accessing the network, or mutating files."""
-    root = root.resolve()
-    issues: list[str] = []
-    skill_path = root / "SKILL.md"
-    skill = read_text(skill_path, root, issues)
-    if skill is None:
-        return issues
+def check_frontmatter(skill: str, package: Path, issues: list[str]) -> dict:
     lines = skill.splitlines()
     if not lines or lines[0] != "---" or "---" not in lines[1:]:
         issues.append("SKILL.md: missing closed YAML frontmatter")
-        data = {}
-    else:
-        end = lines.index("---", 1)
-        data = mapping("\n".join(lines[1:end]), "SKILL.md", issues)
+        return {}
+    end = lines.index("---", 1)
+    data = mapping("\n".join(lines[1:end]), "SKILL.md", issues)
     allowed = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
     if set(data) - allowed:
         issues.append("SKILL.md: unknown frontmatter field")
     name = data.get("name")
     if not isinstance(name, str) or not 1 <= len(name) <= 64 or not NAME.fullmatch(name):
         issues.append("SKILL.md: invalid name")
-    elif root.name != name:
-        issues.append("SKILL.md: name must match package directory")
+    else:
+        if package.name != name:
+            issues.append("SKILL.md: name must match package directory")
+        if any(word in name for word in RESERVED_NAME_WORDS):
+            issues.append("SKILL.md: name contains a reserved word")
     description = data.get("description")
     if not isinstance(description, str) or not 1 <= len(description) <= 1024 or not description.strip():
         issues.append("SKILL.md: description must be 1-1024 nonempty characters")
+    elif XML_TAG.search(description):
+        issues.append("SKILL.md: description must not contain XML tags")
     for field in ("license", "compatibility", "allowed-tools"):
         if field in data and (not isinstance(data[field], str) or not data[field].strip()):
             issues.append(f"SKILL.md: {field} must be a nonempty string")
@@ -171,52 +225,115 @@ def validate(root: Path) -> list[str]:
         issues.append("SKILL.md: this package requires an x.y.z version string")
     if len(lines) >= MAX_CORE_LINES or len(skill.encode()) > MAX_CORE_BYTES:
         issues.append("SKILL.md: exceeds project core size budget")
+    return data
 
-    markdown = []
-    for path in root.rglob("*.md"):
-        if ".git" in path.relative_to(root).parts:
+
+def check_host_metadata(package: Path, name: object, issues: list[str]) -> None:
+    host_path = package / "agents/openai.yaml"
+    if not host_path.exists():
+        return  # Optional host adapter.
+    host_text = read_text(host_path, package, issues)
+    if host_text is None:
+        return
+    host = mapping(host_text, "agents/openai.yaml", issues)
+    for key in set(host) - set(HOST_KEYS):
+        issues.append(f"agents/openai.yaml: unknown top-level key {key!r}")
+    for section, keys in HOST_KEYS.items():
+        value = host.get(section)
+        if value is None:
             continue
-        markdown.append(path)
-        if len(markdown) > MAX_MARKDOWN_FILES:
-            issues.append("package exceeds Markdown file validation budget")
-            return issues
-    direct_targets = set()
-    for path in sorted(markdown):
-        body = skill if path == skill_path else read_text(path, root, issues)
-        if body is not None:
-            targets = check_links(path, body, root, issues)
-            if path == skill_path:
-                direct_targets = targets
-    for folder in ("references", "assets"):
-        for path in (root / folder).glob("*"):
-            if path.suffix in {".md", ".py"} and path.resolve() not in direct_targets:
-                issues.append(f"SKILL.md: missing direct link to {path.relative_to(root)}")
+        if not isinstance(value, dict):
+            issues.append(f"agents/openai.yaml: {section} must be a mapping")
+            continue
+        for key in set(value) - keys:
+            issues.append(f"agents/openai.yaml: unknown {section} key {key!r}")
+    interface = host.get("interface")
+    if isinstance(interface, dict):
+        for key in HOST_KEYS["interface"] & set(interface):
+            if not isinstance(interface[key], str) or not interface[key].strip():
+                issues.append(f"agents/openai.yaml: invalid {key}")
+        prompt = interface.get("default_prompt")
+        if (
+            isinstance(prompt, str)
+            and isinstance(name, str)
+            and not re.search(rf"\${re.escape(name)}(?![a-z0-9-])", prompt)
+        ):
+            issues.append("agents/openai.yaml: default prompt must invoke the skill")
+    policy = host.get("policy")
+    if (
+        isinstance(policy, dict)
+        and "allow_implicit_invocation" in policy
+        and not isinstance(policy["allow_implicit_invocation"], bool)
+    ):
+        issues.append("agents/openai.yaml: allow_implicit_invocation must be a boolean")
 
-    host_path = root / "agents/openai.yaml"
-    host_text = read_text(host_path, root, issues)
-    if host_text is not None:
-        host = mapping(host_text, "agents/openai.yaml", issues)
-        interface = host.get("interface")
-        if not isinstance(interface, dict):
-            issues.append("agents/openai.yaml: missing interface mapping")
-        else:
-            for key in ("display_name", "short_description", "default_prompt"):
-                value = interface.get(key)
-                if not isinstance(value, str) or not value.strip():
-                    issues.append(f"agents/openai.yaml: invalid {key}")
-            prompt = interface.get("default_prompt")
-            if isinstance(prompt, str) and isinstance(name, str) and f"${name}" not in prompt:
-                issues.append("agents/openai.yaml: default prompt must invoke the skill")
 
-    corpus_text = read_text(root / "evals/defensive-design.prompts.csv", root, issues)
-    rubric_text = read_text(root / "evals/behavior-rubric.md", root, issues)
-    ids: list[str] = []
+def package_files(package: Path, issues: list[str]) -> list[Path]:
+    files = []
+    for path in sorted(package.rglob("*")):
+        relative = path.relative_to(package)
+        if any(part in {".git", "__pycache__"} for part in relative.parts) or path.is_dir():
+            continue
+        files.append(path)
+    if len(files) > MAX_PACKAGE_FILES:
+        issues.append("package exceeds file validation budget")
+        return files[:MAX_PACKAGE_FILES]
+    return files
+
+
+def validate_package(package: Path) -> tuple[list[str], str | None]:
+    """Return errors for one installable package and its declared name."""
+    package = package.resolve()
+    issues: list[str] = []
+    skill_path = package / "SKILL.md"
+    skill = read_text(skill_path, package, issues)
+    if skill is None:
+        return issues, None
+    data = check_frontmatter(skill, package, issues)
+    name = data.get("name")
+
+    files = package_files(package, issues)
+    links: dict[Path, set[Path]] = {}
+    for path in files:
+        if path.suffix == ".md":
+            body = skill if path == skill_path.resolve() else read_text(path, package, issues)
+            if body is not None:
+                links[path.resolve()] = check_links(path, body, package, issues)
+
+    direct = links.get(skill_path.resolve(), set())
+    for folder in ("references", "assets", "scripts"):
+        for path in sorted((package / folder).glob("*")):
+            if path.is_file() and path.resolve() not in direct:
+                issues.append(f"SKILL.md: missing direct link to {label(path, package)}")
+
+    reachable = {skill_path.resolve()}
+    queue = deque([skill_path.resolve()])
+    while queue:
+        for target in links.get(queue.popleft(), set()):
+            if target not in reachable:
+                reachable.add(target)
+                queue.append(target)
+    for path in files:
+        relative = label(path, package)
+        if relative not in UNLINKED_PACKAGE_FILES and path.resolve() not in reachable:
+            issues.append(f"{relative}: not reachable from SKILL.md; move maintainer files out of the package")
+
+    check_host_metadata(package, name, issues)
+    return issues, name if isinstance(name, str) else None
+
+
+def validate_evals(root: Path, name: str, issues: list[str]) -> None:
+    """Maintainer evaluation corpus at `<root>/evals`, paired with its rubric."""
+    corpus_text = read_text(root / "evals" / f"{name}.prompts.csv", root, issues)
+    rubric_text = read_text(root / "evals" / "behavior-rubric.md", root, issues)
+    triggers: dict[str, str] = {}
     if corpus_text is not None:
         try:
             reader = csv.DictReader(io.StringIO(corpus_text), strict=True)
             if reader.fieldnames != ["id", "should_trigger", "prompt"]:
                 issues.append("eval corpus: invalid header")
-            classes = set()
+            prompts: Counter[str] = Counter()
+            ids: list[str] = []
             for row in reader:
                 ident = row.get("id") or ""
                 ids.append(ident)
@@ -224,20 +341,72 @@ def validate(root: Path) -> list[str]:
                     issues.append(f"eval corpus: invalid id or boolean in {ident!r}")
                 if None in row or not (row.get("prompt") or "").strip():
                     issues.append(f"eval corpus: missing prompt or extra columns in {ident!r}")
-                classes.add(row.get("should_trigger"))
-            if classes != {"true", "false"}:
-                issues.append("eval corpus: positive and negative coverage required")
+                prompts[" ".join((row.get("prompt") or "").split()).lower()] += 1
+                triggers[ident] = row.get("should_trigger") or ""
             if len(ids) != len(set(ids)):
                 issues.append("eval corpus: duplicate case ID")
+            if any(count > 1 for count in prompts.values()):
+                issues.append("eval corpus: duplicate prompt")
+            negatives = sum(value == "false" for value in triggers.values())
+            if not ids or negatives == 0 or negatives == len(ids):
+                issues.append("eval corpus: positive and negative coverage required")
+            elif negatives / len(ids) < MIN_NEGATIVE_SHARE:
+                issues.append(f"eval corpus: negative cases below {MIN_NEGATIVE_SHARE:.0%}")
         except csv.Error as exc:
             issues.append(f"eval corpus: invalid CSV: {exc}")
     if rubric_text is not None:
-        rubric_ids = [ident for ident, body in RUBRIC_ID.findall(rubric_text) if body.strip()]
+        rows = [(ident, body) for ident, body in RUBRIC_ID.findall(rubric_text) if body.strip()]
+        rubric_ids = [ident for ident, _ in rows]
         if len(rubric_ids) != len(set(rubric_ids)):
             issues.append("eval rubric: duplicate case ID")
-        if set(rubric_ids) != set(ids):
+        if set(rubric_ids) != set(triggers):
             issues.append("eval rubric: case IDs must exactly match the corpus")
+        for ident, body in rows:
+            says_negative = body.startswith(NEGATIVE_RUBRIC_PREFIX)
+            if ident in triggers and says_negative != (triggers[ident] == "false"):
+                issues.append(f"eval rubric: {ident} polarity disagrees with should_trigger")
+
+
+def validate(root: Path) -> list[str]:
+    """Return errors without executing examples, accessing the network, or mutating files."""
+    root = root.resolve()
+    issues: list[str] = []
+    packages = sorted(path.parent for path in (root / "skills").glob("*/SKILL.md"))
+    if not packages:
+        return ["skills/: no skills/<name>/SKILL.md package found"]
+    license_path = root / "LICENSE"
+    for package in packages:
+        package_issues, name = validate_package(package)
+        prefix = label(package, root)
+        issues.extend(f"{prefix}/{issue}" for issue in package_issues)
+        packaged_license = package / "LICENSE"
+        if license_path.exists() and (
+            not packaged_license.exists()
+            or packaged_license.read_bytes() != license_path.read_bytes()
+        ):
+            issues.append(f"{prefix}/LICENSE: must be an identical copy of the repository LICENSE")
+        if name is not None:
+            validate_evals(root, name, issues)
+    check_repository_docs(root, issues)
     return issues
+
+
+def check_repository_docs(root: Path, issues: list[str]) -> None:
+    """Check local links in maintainer Markdown outside the installable packages."""
+    skipped = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache"}
+    docs = [
+        path
+        for path in sorted(root.rglob("*.md"))
+        if not skipped.intersection(path.relative_to(root).parts)
+        and path.relative_to(root).parts[0] != "skills"
+    ]
+    if len(docs) > MAX_PACKAGE_FILES:
+        issues.append("repository exceeds Markdown validation budget")
+        docs = docs[:MAX_PACKAGE_FILES]
+    for path in docs:
+        body = read_text(path, root, issues)
+        if body is not None:
+            check_links(path, body, root, issues)
 
 
 def main() -> int:
@@ -249,7 +418,7 @@ def main() -> int:
         print(f"ERROR: {issue}", file=sys.stderr)
     if issues:
         return 1
-    print("PASS: skill metadata, local links, host metadata and eval/rubric structure")
+    print("PASS: package metadata, reachability, local links, host metadata and eval structure")
     return 0
 
 

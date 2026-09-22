@@ -1,5 +1,9 @@
 # Evaluating the skill
 
+This directory is maintainer-only and is deliberately outside the installable package,
+so an agent under evaluation cannot read the expected outcomes. Case-level agents must
+not be given access to it.
+
 ## Static and executable checks
 
 Run `python scripts/validate_skill.py` for metadata, packaged local links, optional host
@@ -7,7 +11,7 @@ metadata, and exact trigger/rubric case correspondence. Its Markdown support is 
 inline link and ATX heading format used in this repository, not a general Markdown
 parser. It does not fetch URLs or execute repository commands from documentation.
 
-Run `python scripts/verify_reference.py` for the 43 historical HTTP reference checks and
+Run `python scripts/verify_reference.py` for the 56 HTTP reference checks and
 `python -m unittest discover -s tests -v` for deadline and validator regression tests.
 These establish package/example properties, not model behavior.
 

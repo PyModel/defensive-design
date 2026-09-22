@@ -1,10 +1,10 @@
 ---
 name: defensive-design
-description: Use when explicitly asked for defensive design or robustness, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract. Adapts to any language or architecture using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
+description: Use when explicitly asked for defensive design or robustness, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract. Adapts to any language and any level, from one function or type to modules, applications and distributed systems, using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
 license: MIT
 metadata:
   author: PyModel
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # Defensive Design
@@ -48,16 +48,16 @@ Before choosing controls, establish only the facts material to the task:
   degradation, cancellation, and failure where callers must distinguish them.
 - **Consequences:** invariants, data sensitivity, safety hazards, durable/irreversible
   effects, compatibility promises, and tolerable loss or staleness.
-- **Execution:** library/process/device/browser/service boundaries, state ownership,
-  concurrency model, deployment topology, lifecycle, and actual authority boundary.
+- **Execution:** the level that owns each invariant (function, type, module, process,
+  store, or distributed system), state ownership, concurrency model, deployment
+  topology, lifecycle, and actual authority boundary.
 - **Budgets:** input and output sizes, work, memory, latency, retries, concurrency,
   backlog age, cost, and recovery objectives justified by this system's needs.
 - **Existing facilities:** native types, errors, validation, synchronization, lifecycle,
   transactions, retries, security, telemetry, tests, and deployment mechanisms.
 
-Read [architecture adaptation](references/architecture-adaptation.md) for unfamiliar,
-multiple, non-service, or changing execution models. Use the optional
-[assessment template](assets/assessment-template.md) only when the task warrants it.
+Use the optional [assessment template](assets/assessment-template.md) only when the
+task warrants it; step 4 routes each surface to its reference.
 Unknown budgets remain assumptions or measurements to obtain, not invented defaults.
 
 ### Scale depth by consequence, not code size
@@ -89,6 +89,8 @@ For non-trivial work, record:
 Keep these axes separate: caller result, cause, effect certainty, policy limit,
 operating state, scope, and retry decision. A timeout can coexist with a committed
 write; overload is not a policy denial; an empty result is not a failed query.
+Separate a trusted caller's broken precondition (a bug: fail fast in every build)
+from invalid external input (a stable rejection, never an assertion or crash).
 Use repository-native representations, not a new mandatory error hierarchy.
 Read [failure taxonomy](references/failure-taxonomy.md) when the distinctions matter.
 
@@ -146,12 +148,17 @@ Apply these invariants to the actual failure surfaces:
    resources, handle restart/crash gaps, and preserve committed state. Define old/new
    reader and writer compatibility before evolving durable or public contracts.
 
-For Tier 2/3 or unfamiliar controls, load the relevant sections of
-[defensive checklists](references/defensive-checklists.md), marking non-applicable
-surfaces with a reason. For every security-sensitive boundary, independently of tier,
-read the [secure coding overlay](references/secure-coding-overlay.md).
-Use [primary sources](references/sources.md) for rationale and platform-specific checks;
-verify version-sensitive behavior against the actual dependency/runtime version.
+Load only the reference that owns the surface in front of you:
+
+| Surface | Reference |
+|---|---|
+| Function, type, module or library interface; programmer errors; resource ownership | [code-level design](references/code-level-design.md) |
+| Unfamiliar, hybrid, local, offline, device, data or infrastructure execution model | [architecture adaptation](references/architecture-adaptation.md) |
+| Several outcomes collapse into one result; retry or effect certainty is unclear | [failure taxonomy](references/failure-taxonomy.md) |
+| Tier 2/3 control, or a control you have not applied before | [defensive checklists](references/defensive-checklists.md), marking non-applicable surfaces with a reason |
+| Any security-sensitive boundary, independently of tier | [secure coding overlay](references/secure-coding-overlay.md) |
+| Choosing failure-path tests; runtime signals; migration, rollout or fault injection | [verification and rollout](references/verification-and-chaos.md) |
+| Rationale or a platform-specific claim | [primary sources](references/sources.md); verify against the actual dependency/runtime version |
 
 ## 5. Implement and verify the final state
 
@@ -179,8 +186,6 @@ exact commands, revision/environment, results, coverage limitations, and one evi
 
 Repository observations also cite paths, symbols and revision; do not label code
 inspection as an executed behavioral test. Contradictory evidence remains visible.
-Read [verification and rollout](references/verification-and-chaos.md) for higher-risk
-verification, observability, migration, fault-injection approval, and rollback gates.
 
 ## 6. Deliver a decision, not a checklist dump
 
@@ -200,13 +205,8 @@ Completion means the authorized scope and applicable acceptance criteria are sat
 a pushed branch is not a merge, a merge is not a deployment, and package validation is
 not evidence that an agent performs correctly on every codebase.
 
-## Optional example and maintainer checks
+## Optional example
 
 The [Python HTTP reference](references/resilient_http_example.py) is illustrative,
 not an application dependency or default architecture. It requires its documented
 runtime and caller-owned transport policy. Read it only for a matching HTTP boundary.
-
-Maintainer checks and behavioral evaluation instructions live in
-[the evaluation guide](evals/README.md). Trigger cases and expected outcomes are in
-[the prompt corpus](evals/defensive-design.prompts.csv) and
-[the behavior rubric](evals/behavior-rubric.md). Static checks cannot establish model behavior.

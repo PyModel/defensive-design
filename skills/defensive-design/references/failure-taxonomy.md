@@ -12,7 +12,7 @@ the dimensions that change a decision; do not force compatible facts into one
 | Axis | Question | Stable labels |
 |---|---|---|
 | Result | What should the caller observe? | `success`, `absence`, `invalid`, `unauthenticated`, `unauthorized`, `conflict`, `degraded`, `cancelled`, `failed` |
-| Cause | Why did it happen? | `transient_dependency`, `permanent_dependency`, `invariant_violation`, or a repository-native domain cause |
+| Cause | Why did it happen? | `transient_dependency`, `permanent_dependency`, `contract_violation`, `invariant_violation`, or a repository-native domain cause |
 | Effect certainty | Did the intended effect occur? | `not_started`, `not_committed`, `committed`, `unknown_outcome`, `partial_success` |
 | Policy | Did an authoritative limit decide it? | `policy_limit` or a repository-native policy result |
 | State | Which operating condition changes handling? | `overloaded`, `stale_work`, or a repository-native state |
@@ -44,6 +44,10 @@ class hierarchy.
 | `cancelled` | Caller or system abandoned the operation | Propagate cancellation and release owned resources |
 | `failed` | Operation ended without a more specific caller result | Return stable failure; preserve the cause; do not infer retryability |
 | `invariant_violation` | Impossible, corrupt, or security-sensitive state observed | Stop the unsafe path; preserve evidence; quarantine or escalate |
+| `contract_violation` | A trusted internal caller broke a documented precondition (a bug, not hostile input) | Fail fast in every build; do not retry, degrade, or report it as caller-input `invalid` |
+
+Hostile or external input that breaks a contract is `invalid`, never a crash or an
+assertion; see [code-level design](code-level-design.md) for the programmer-error boundary.
 
 `not_found` is not automatically permanent: valid absence, a lagging replica, and a
 misconfigured endpoint have different causes and retry policies. Classify against the
@@ -116,7 +120,7 @@ retention, secrecy, and telemetry policy; neither is automatically safe to expos
 ## Expressing It Over HTTP
 
 Do not overload `null`, `false`, an empty collection, or a generic 500 with several
-meanings. RFC 9457 problem details can carry a stable `type` URI plus bounded extension
+meanings. [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) problem details can carry a stable `type` URI plus bounded extension
 members for retry policy, effect certainty, correlation identity, and partial state.
 Status codes alone are insufficient because one code can represent several causes.
 

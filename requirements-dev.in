@@ -1,0 +1,8 @@
+# Direct maintainer dependencies. Regenerate requirements-dev.txt with:
+#   uv pip compile requirements-dev.in --universal --python-version 3.11 --generate-hashes -o requirements-dev.txt
+# No dependency is required to read or use the installable skill.
+httpx==0.28.1
+PyYAML==6.0.3
+ruff==0.16.8
+mypy==2.3.1
+types-PyYAML==6.0.12.20260906

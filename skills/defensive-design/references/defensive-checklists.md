@@ -2,12 +2,13 @@
 
 Companion to `SKILL.md`. Use these when the change is Tier 2 or Tier 3, or when a
 control is unfamiliar. Apply only to surfaces that exist; tiers do not mandate every
-mechanism below. Use `architecture-adaptation.md` for ownership, local/offline,
-long-lived, numerical, UI, device, and infrastructure contexts. Failure classification lives in `references/failure-taxonomy.md`;
-security-sensitive boundaries live in `references/secure-coding-overlay.md`; verification,
-runtime signals, and rollout gates live in `references/verification-and-chaos.md`. Each item is a question to answer, not a mandate to
-implement. An item that does not apply to the change is answered "not applicable
-because ..." and dropped.
+mechanism below. Each item is a question to answer, not a mandate to implement. An
+item that does not apply is answered "not applicable because ..." and dropped.
+
+Related references own the rest: `architecture-adaptation.md` for execution models and
+ownership, `code-level-design.md` for function/type/module design, `failure-taxonomy.md`
+for classification, `secure-coding-overlay.md` for security-sensitive boundaries, and
+`verification-and-chaos.md` for failure-path tests, runtime signals and rollout gates.
 
 ## Deadlines and Timeouts
 
@@ -77,6 +78,7 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Does the protected resource itself reject writes carrying a fence below the current generation? A token that nothing checks is decorative — lease expiry does not inform the paused holder.
 - [ ] Are lock hold times bounded, and is remote I/O kept out of critical sections where possible?
 - [ ] Is deadlock avoided by consistent acquisition order or by lock timeouts?
+- [ ] Within one process, can another thread, task, callback, or `await`/yield point run between a check and the action that depends on it? Re-check after resuming or make the transition atomic.
 
 ## Capacity, Bounds, and Backpressure
 
@@ -173,43 +175,11 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 - [ ] Are privileged and irreversible effects audited where policy requires it, with append-only semantics?
 - [ ] Does readiness reflect the ability to serve safely, and liveness avoid restarting a healthy process during a dependency outage?
 
-## Failure-Path Tests
-
-Prefer deterministic clocks, injected randomness, controllable fakes, and
-synchronization primitives over sleeps. A test that passes by timing luck is not
-evidence. Report each item as `verified`, `reasoned_not_run`, `blocked`, or
-`not_applicable` — a check that could not run is never a pass.
-
-- [ ] Success with representative input, and valid absence returning an explicit no-data result.
-- [ ] Invalid, malformed, wrong-type, oversized, and excessively-nested input rejected with a stable error.
-- [ ] Unauthenticated and unauthorized requests denied, including on cache-hit, fallback, and replay paths.
-- [ ] Timeout on a dependency: expiry is correctly reported, cooperative completion is checked, and any required hard runtime bound is tested independently.
-- [ ] Transient failure followed by success: retried and resolved within the attempt and deadline budget.
-- [ ] Permanent failure: not retried, surfaced promptly.
-- [ ] An effectful operation described as a read: not retried unless its semantics and effect certainty make repetition safe.
-- [ ] Policy-enforcement dependency failure: authoritative security, abuse, cost, safety, or contractual limit remains enforced.
-- [ ] Retry budget exhausted: the correct terminal result, known committed effects preserved, and partial or unknown effects explicitly reconciled rather than assumed rolled back.
-- [ ] Duplicate request with the same idempotency key: one effect, consistent response.
-- [ ] Same key with different request semantics: conflict, not a silent replay.
-- [ ] Concurrent requests on the same key or resource: the invariant holds under real parallelism.
-- [ ] Ambiguous write outcome (timeout after the effect committed): resolved without duplicating the effect.
-- [ ] Crash or restart between claiming a key and committing: recovery leaves a consistent state.
-- [ ] Partial multi-item result: per-item status returned, failed items reconciled or compensated.
-- [ ] Fallback path exercised: security context preserved, result labelled degraded, not cached as ordinary success.
-- [ ] Stale or degraded data blocked from driving a privileged or irreversible decision.
-- [ ] Cancellation mid-flight: new work stops, cancellation propagates where supported, resources are released, and committed or unknown effects remain explicit.
-- [ ] Graceful shutdown during in-flight work: drained or checkpointed, leases released.
-- [ ] Worker lease expiry and redelivery: no duplicate effect, no lost message.
-- [ ] Poison message: dead-lettered, pipeline continues.
-- [ ] Bounds enforced: full queue, oversized payload, excessive fan-out, deep recursion, large result set.
-- [ ] Backpressure: overload produces deliberate rejection or shedding rather than collapse.
-- [ ] Stale work past its deadline or TTL is dropped, not processed at capacity cost.
-- [ ] Stale lease holder resumes after a new holder acquired the lease: its write is rejected by fence.
-- [ ] Cache failure: treated as a miss where safe, never as an authorization bypass.
-- [ ] Logs and metrics from failure paths contain no secrets and no unbounded cardinality.
-- [ ] Secret canaries, encoded payloads, and sink-specific injection probes do not reach telemetry, syntax, privilege, or unintended resources.
-
 ## Local Computation, UI, and Platform Boundaries
+
+For function, type and module design — invariant ownership, programmer errors versus
+input errors, parsing at the boundary and resource ownership — use
+`references/code-level-design.md`.
 
 - [ ] Are units, overflow, precision, rounding, NaN/infinity, empty values and complexity checked where they affect the contract?
 - [ ] Are resource and synchronization controls native to the actual process, device or deployment boundary, rather than copied from a distributed service?
