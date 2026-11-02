@@ -1,0 +1,36 @@
+name: audit
+
+# GitHub's dependency graph only recognizes `requirements.txt`, so it does not see
+# requirements-dev.txt and Dependabot alerts cover none of the locked packages.
+# This audits the hash lock directly; the weekly run catches new advisories
+# against unchanged pins. GitHub disables scheduled runs after 60 days without repo activity.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      # The auditor is version-pinned, not hash-locked: it runs in this job only,
+      # with a read-only token and no secrets, and never touches the tested baseline.
+      - name: Install pip-audit
+        run: python -m pip install 'pip-audit==2.10.1'
+      - name: Audit the hash-locked maintainer dependencies
+        run: python -m pip_audit --require-hashes --disable-pip -r requirements-dev.txt
