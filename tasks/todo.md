@@ -10,15 +10,16 @@ bump. No commit, push or release was authorized.
 ## Completed
 
 - [x] F1 `verified`: locked `certifi` 2026.7.22 had PYSEC-2026-4320 (pip-audit 2.10.1).
-  Raised to the first fixed release, 2026.10.18, with `--upgrade-package`; no other pin
-  changed.
+  Raised to 2026.10.23 with `--upgrade-package` (PR #4 review: 2026.10.18 dropped
+  all four emSign roots; counted in each wheel: 10.19 has 3, 10.23 has 1); no other pin changed.
 - [x] F2 `verified`: Dependabot alerts were on but covered nothing. GitHub's dependency
   graph returned zero manifests because it only reads `requirements.txt`. Added the
   `audit` workflow (push, PR, weekly); new check name, existing names untouched.
-- [x] Seeded stdlib property tests (`tests/test_fuzz_boundaries.py`, 9 tests) and a
+- [x] Seeded stdlib property tests (`tests/test_fuzz_boundaries.py`, 10 tests) and a
   public-surface pin (`tests/test_public_surface.py`, 2 tests). A hand mutation run
   removed each guarded property in turn: 9 of 9 detected, after adding explicit
-  dot-segment seeds for the one survivor.
+  dot-segment seeds for the one survivor. PR #4 review added exact-value checks for
+  valid digit headers; 2 of 2 new mutants detected.
 - [x] `SECURITY.md`; Dependabot version updates for workflow actions only.
 - [x] Repository settings changed on 2026-11-02, all reversible: private vulnerability
   reporting, secret scanning and secret push protection set to enabled.
@@ -40,7 +41,7 @@ bump. No commit, push or release was authorized.
 
 `verified` locally on 2026-11-02 with hash-locked venvs on Python 3.11.14, 3.12.14,
 3.13.11 and 3.14.9. All of these passed on each version: `validate_skill.py`,
-`verify_reference.py` (56 checks), unittest (59 tests), Ruff, mypy, strict mypy and
+`verify_reference.py` (56 checks), unittest (60 tests), Ruff, mypy, strict mypy and
 compileall. `uv pip check` also passed. On 3.11, `mutation_check.py` killed 13 of 13
 mutants. `pip-audit --require-hashes --disable-pip` found no known vulnerabilities.
 `git diff --check` passed. The HTTPX 0.27.0 path also passed on 3.11 (validator, 56

@@ -56,7 +56,14 @@ class RetryAfterProperties(unittest.TestCase):
         for _ in range(ROUNDS):
             max_s = rng.choice([0.5, 1.0, 30.0, 3600.0])
             self.check(strings(rng), max_s)
-            self.check(digit_strings(rng), max_s)
+            digits = digit_strings(rng)
+            self.check(digits, max_s)
+            seconds = int(digits.strip())
+            hint = mod._parse_retry_after(digits, max_s, now=NOW)
+            if seconds <= max_s:
+                self.assertEqual(hint.delay_s, seconds, digits)
+            else:
+                self.assertTrue(hint.exceeds_limit, digits)
             offset = timedelta(seconds=rng.uniform(-1e6, 1e9))
             self.check(format_datetime(NOW + offset, usegmt=True), max_s)
         self.check(None, 1.0)
@@ -77,6 +84,14 @@ class ContentLengthProperties(unittest.TestCase):
                     self.assertTrue(stripped.isascii() and stripped.isdigit(), raw)
                     self.assertEqual(result, int(stripped), raw)
                     self.assertLess(result, 10**18, raw)
+
+    def test_valid_ascii_digits_parse_to_their_value(self) -> None:
+        rng = random.Random(SEED)
+        for _ in range(ROUNDS):
+            raw = digit_strings(rng)
+            value = int(raw.strip())
+            expected = value if value < 10**18 else None
+            self.assertEqual(mod._parse_content_length(raw), expected, raw)
 
 
 class TextAndIdentifierProperties(unittest.TestCase):

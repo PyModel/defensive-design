@@ -4,8 +4,9 @@
 
 ### Security
 
-- The locked `certifi` 2026.7.22 had PYSEC-2026-4320. Raised to 2026.10.18, the first
-  fixed release; no other pin changed.
+- The locked `certifi` 2026.7.22 had PYSEC-2026-4320. Raised to 2026.10.23,
+  the latest release; no other pin changed. The first fixed release, 2026.10.18,
+  dropped all four emSign roots; 2026.10.19 restored three and 2026.10.23 keeps one.
 
 ### Added
 
@@ -18,7 +19,8 @@
 - `tests/test_fuzz_boundaries.py`: seeded generative property tests for Retry-After,
   Content-Length, display text, user-ID path segments, domain canonicalization, JSON
   depth, the Markdown helpers and local-link confinement. Each property was checked
-  against a deliberate defect (9 of 9 detected).
+  against a deliberate defect (11 of 11 detected), including exact values for
+  valid ASCII-digit Retry-After and Content-Length headers.
 - `tests/test_public_surface.py`: pins the 12 package paths and the `FetchStatus`
   names and values.
 
