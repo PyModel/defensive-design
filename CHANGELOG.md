@@ -13,6 +13,8 @@
 - `audit` workflow: `pip-audit` on `requirements-dev.txt` on push, pull request and
   weekly. GitHub's dependency graph only reads `requirements.txt`, so Dependabot alerts
   were covering none of the locked packages.
+- `requirements-audit.txt`: a separate hash lock for `pip-audit`, so the audit job no
+  longer resolves the auditor's dependencies unpinned.
 - Dependabot version updates for the pinned workflow actions. Python pins stay manual
   because the `.in` file and its hash lock must be regenerated together.
 - `SECURITY.md` with private reporting through GitHub security advisories.

@@ -1,0 +1,3 @@
+# Auditor for the `audit` workflow, locked apart from the tested baseline. Regenerate with:
+#   uv pip compile requirements-audit.in --universal --python-version 3.11 --generate-hashes -o requirements-audit.txt
+pip-audit==2.10.1

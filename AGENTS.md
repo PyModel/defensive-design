@@ -15,14 +15,14 @@ Only `skills/defensive-design/` is installed; installers copy that whole directo
 - `skills/defensive-design/LICENSE`: identical copy of the root LICENSE.
 - `evals/`: trigger cases, behavior rubric and evaluation procedure. Never package them;
   a rubric installed next to the skill contaminates behavioral evaluation.
-- `scripts/`, `tests/`, `pyproject.toml`, `requirements-dev.*`: maintainer checks.
+- `scripts/`, `tests/`, `pyproject.toml`, `requirements-dev.*`, `requirements-audit.*`: maintainer checks.
 - `tasks/todo.md`: current work evidence and clearly separated historical records.
 
 Every packaged file must be reachable from `SKILL.md`; the validator rejects orphans.
 
 Preserve the public skill name, supported reference paths and example result types
 unless a documented migration justifies a break. Regenerate hash-locked dependencies
-from `requirements-dev.in` with the command in that file, keep CI action pins reviewed,
+from `requirements-dev.in` and `requirements-audit.in` with the command in each file, keep CI action pins reviewed,
 and preserve the existing protected-branch check names.
 
 ## Change discipline

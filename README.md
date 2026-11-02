@@ -112,7 +112,7 @@ latest-0.x compatibility canary. Action revisions are pinned, token access is re
 credentials are not persisted, and job durations and artifact retention are bounded.
 The source snapshot and environment artifact identify what actually ran. Pinning does
 not constitute a supply-chain audit; operating-system runners remain managed images.
-A separate `audit` workflow runs `pip-audit` on the hash lock on every change and weekly;
+A separate `audit` workflow runs a hash-locked `pip-audit` on both locks on every change and weekly;
 it reports known advisories and is no defense against a malicious package. Report
 vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
