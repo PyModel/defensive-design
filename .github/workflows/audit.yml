@@ -28,9 +28,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
-      # The auditor is version-pinned, not hash-locked: it runs in this job only,
-      # with a read-only token and no secrets, and never touches the tested baseline.
-      - name: Install pip-audit
-        run: python -m pip install 'pip-audit==2.10.1'
+      # The auditor has its own hash lock so it never touches the tested baseline, and an
+      # unpinned transitive dependency cannot turn the audit falsely green.
+      - name: Install hash-locked pip-audit
+        run: python -m pip install --require-hashes -r requirements-audit.txt
+      # One run per lock: pip-audit rejects a package listed in two requirement files.
       - name: Audit the hash-locked maintainer dependencies
         run: python -m pip_audit --require-hashes --disable-pip -r requirements-dev.txt
+      - name: Audit the hash-locked auditor dependencies
+        run: python -m pip_audit --require-hashes --disable-pip -r requirements-audit.txt

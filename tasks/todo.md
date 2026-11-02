@@ -3,9 +3,10 @@
 ## Scope
 
 Pasted external review (2026-11-02) of `main@97e6479` recommending 14 assurance
-enhancements. Branch `harden/assurance-from-review`. Implemented the in-repo items with
-real failure surfaces; nothing under `skills/defensive-design/` changed, so no version
-bump. No commit, push or release was authorized.
+enhancements. Implemented the in-repo items with real failure surfaces; nothing under
+`skills/defensive-design/` changed, so no version bump. On user instruction the work was
+merged to `main` through PR #4 (rebase), followed by the first Dependabot actions PR #5.
+No release was made.
 
 ## Completed
 
@@ -21,6 +22,11 @@ bump. No commit, push or release was authorized.
   dot-segment seeds for the one survivor. PR #4 review added exact-value checks for
   valid digit headers; 2 of 2 new mutants detected.
 - [x] `SECURITY.md`; Dependabot version updates for workflow actions only.
+- [x] Follow-up branch `fix/hash-lock-auditor`: the `audit` job installed `pip-audit`
+  with unpinned transitive dependencies. It now installs from its own hash lock
+  (`requirements-audit.txt`) and audits both locks.
+- [x] Keep-alive for the weekly audit schedule: merge the weekly Dependabot actions PRs
+  (user choice, 2026-11-02). Making the audit a required check was declined.
 - [x] Repository settings changed on 2026-11-02, all reversible: private vulnerability
   reporting, secret scanning and secret push protection set to enabled.
 
@@ -40,15 +46,16 @@ bump. No commit, push or release was authorized.
 ## Verification evidence
 
 `verified` locally on 2026-11-02 with hash-locked venvs on Python 3.11.14, 3.12.14,
-3.13.11 and 3.14.9. All of these passed on each version: `validate_skill.py`,
-`verify_reference.py` (56 checks), unittest (60 tests), Ruff, mypy, strict mypy and
-compileall. `uv pip check` also passed. On 3.11, `mutation_check.py` killed 13 of 13
+3.13.11 and 3.14.9 for the first PR #4 commit. All of these passed on each version:
+`validate_skill.py`, `verify_reference.py` (56 checks), unittest (59 tests), Ruff, mypy,
+strict mypy and compileall. The review-fix commit (60 tests) was rerun locally on 3.11
+only; hosted CI passed all four versions on it and on `main` after each merge. `uv pip check` also passed. On 3.11, `mutation_check.py` killed 13 of 13
 mutants. `pip-audit --require-hashes --disable-pip` found no known vulnerabilities.
 `git diff --check` passed. The HTTPX 0.27.0 path also passed on 3.11 (validator, 56
 checks, 59 tests). Jev `gate_range` verified every claim, but its patch review
 escalated at safe_to_apply 0.77 with correctness confidence 0.19. The diff was then
-read in full. `reasoned_not_run`: the hosted `audit` workflow run and the
-first Dependabot PR.
+read in full. `verified` hosted: the `audit` workflow passed on PR #4, PR #5 and `main`;
+the first Dependabot PR (#5) had its pinned SHAs matched to upstream tags before merge.
 
 ---
 
