@@ -99,6 +99,9 @@ operation deadlines, retry classification and budgets, cancellation, breaker tra
 input validation, JSON nesting and telemetry. `scripts/mutation_check.py` removes each
 of 13 defensive controls in turn and fails if any removal goes undetected. Separate deterministic tests cover
 late synchronous parsing/cleanup at the deadline and malformed package fixtures.
+Seeded generative tests check parser, identifier, JSON-depth and link-confinement
+properties over thousands of inputs, and a surface test pins the documented package
+paths and `FetchStatus` values.
 The reference rejects late completion but cannot preempt blocking CPU/native work.
 DNS, TLS, proxies, real provider behavior and application-specific transport/logging
 policies remain caller-owned integration boundaries.
@@ -109,6 +112,9 @@ latest-0.x compatibility canary. Action revisions are pinned, token access is re
 credentials are not persisted, and job durations and artifact retention are bounded.
 The source snapshot and environment artifact identify what actually ran. Pinning does
 not constitute a supply-chain audit; operating-system runners remain managed images.
+A separate `audit` workflow runs `pip-audit` on the hash lock on every change and weekly;
+it reports known advisories and is no defense against a malicious package. Report
+vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 The corpus has **63 cases: 49 positive, 14 negative**, including Go, Rust, TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
 quality. See the evaluation guide for case-level behavioral testing before claiming

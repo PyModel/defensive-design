@@ -1,0 +1,14 @@
+# Version updates for the SHA-pinned workflow actions only.
+# Python maintainer dependencies are not listed: requirements-dev.txt is generated from
+# requirements-dev.in by `uv pip compile --generate-hashes`, and an update must
+# regenerate both files together (see AGENTS.md). The audit workflow checks them for
+# known vulnerabilities, because the dependency graph does not read that file name.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

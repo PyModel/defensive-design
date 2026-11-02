@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased (maintainer tooling only; the installable package is unchanged)
+
+### Security
+
+- The locked `certifi` 2026.7.22 had PYSEC-2026-4320. Raised to 2026.10.18, the first
+  fixed release; no other pin changed.
+
+### Added
+
+- `audit` workflow: `pip-audit` on `requirements-dev.txt` on push, pull request and
+  weekly. GitHub's dependency graph only reads `requirements.txt`, so Dependabot alerts
+  were covering none of the locked packages.
+- Dependabot version updates for the pinned workflow actions. Python pins stay manual
+  because the `.in` file and its hash lock must be regenerated together.
+- `SECURITY.md` with private reporting through GitHub security advisories.
+- `tests/test_fuzz_boundaries.py`: seeded generative property tests for Retry-After,
+  Content-Length, display text, user-ID path segments, domain canonicalization, JSON
+  depth, the Markdown helpers and local-link confinement. Each property was checked
+  against a deliberate defect (9 of 9 detected).
+- `tests/test_public_surface.py`: pins the 12 package paths and the `FetchStatus`
+  names and values.
+
 ## 1.3.0 - 2026-09-22
 
 ### Changed (layout)

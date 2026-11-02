@@ -1,3 +1,58 @@
+# Assurance hardening work ledger (unreleased, maintainer tooling only)
+
+## Scope
+
+Pasted external review (2026-11-02) of `main@97e6479` recommending 14 assurance
+enhancements. Branch `harden/assurance-from-review`. Implemented the in-repo items with
+real failure surfaces; nothing under `skills/defensive-design/` changed, so no version
+bump. No commit, push or release was authorized.
+
+## Completed
+
+- [x] F1 `verified`: locked `certifi` 2026.7.22 had PYSEC-2026-4320 (pip-audit 2.10.1).
+  Raised to the first fixed release, 2026.10.18, with `--upgrade-package`; no other pin
+  changed.
+- [x] F2 `verified`: Dependabot alerts were on but covered nothing. GitHub's dependency
+  graph returned zero manifests because it only reads `requirements.txt`. Added the
+  `audit` workflow (push, PR, weekly); new check name, existing names untouched.
+- [x] Seeded stdlib property tests (`tests/test_fuzz_boundaries.py`, 9 tests) and a
+  public-surface pin (`tests/test_public_surface.py`, 2 tests). A hand mutation run
+  removed each guarded property in turn: 9 of 9 detected, after adding explicit
+  dot-segment seeds for the one survivor.
+- [x] `SECURITY.md`; Dependabot version updates for workflow actions only.
+- [x] Repository settings changed on 2026-11-02, all reversible: private vulnerability
+  reporting, secret scanning and secret push protection set to enabled.
+
+## Not done (with reason)
+
+- `blocked`: automated agent-behavior evals in CI need model API secrets and a budget
+  decision. The full 63-case corpus is still unrun.
+- `not_applicable`: release provenance and attestations, because no releases exist.
+- Declined as disproportionate for one maintainer and about 3k lines of Python:
+  Hypothesis and pytest (a seeded stdlib generator covers the same properties with no
+  new dependency), CONTRIBUTING (AGENTS.md covers it), CODEOWNERS, generic mutation
+  testing, pre-commit, coverage gates, perf benchmarks, Bandit, Semgrep and an SBOM.
+- Open, user decision: CodeQL default setup (`not-configured`).
+- Dependabot for pip was left out on purpose. It is not verified to regenerate the `.in`
+  file and the uv hash lock together, so Python pins stay manual.
+
+## Verification evidence
+
+`verified` locally on 2026-11-02 with hash-locked venvs on Python 3.11.14, 3.12.14,
+3.13.11 and 3.14.9. All of these passed on each version: `validate_skill.py`,
+`verify_reference.py` (56 checks), unittest (59 tests), Ruff, mypy, strict mypy and
+compileall. `uv pip check` also passed. On 3.11, `mutation_check.py` killed 13 of 13
+mutants. `pip-audit --require-hashes --disable-pip` found no known vulnerabilities.
+`git diff --check` passed. The HTTPX 0.27.0 path also passed on 3.11 (validator, 56
+checks, 59 tests). Jev `gate_range` verified every claim, but its patch review
+escalated at safe_to_apply 0.77 with correctness confidence 0.19. The diff was then
+read in full. `reasoned_not_run`: the hosted `audit` workflow run and the
+first Dependabot PR.
+
+---
+
+## Historical 1.3.0 record (not current task instructions or new evidence)
+
 # Defensive Design 1.3.0 work ledger
 
 ## Scope
