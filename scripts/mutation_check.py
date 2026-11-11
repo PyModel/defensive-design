@@ -72,6 +72,22 @@ MUTANTS: dict[str, tuple[str, str]] = {
         "    if _json_depth_exceeds(text, MAX_JSON_DEPTH):\n",
         "    if False:\n",
     ),
+    "backoff cap": (
+        "config.max_delay_s, config.base_delay_s * (2 ** (attempt - 1))",
+        "config.base_delay_s * (2 ** (attempt - 1)), 1e9",
+    ),
+    "stale failure permit fenced": (
+        "            if permit != self._generation:\n                return\n            was_half_open",
+        "            was_half_open",
+    ),
+    "declared length fast path": (
+        "    if declared is not None and declared > max_bytes:\n        return None\n",
+        "",
+    ),
+    "pool wait ends before the attempt timer": (
+        "            self.per_attempt_timeout_s / 2\n",
+        "            self.per_attempt_timeout_s\n",
+    ),
     "late-completion recheck": (
         "            if loop.time() >= deadline:\n                raise TimeoutError\n",
         "",
@@ -86,7 +102,10 @@ def run_suites(work: Path) -> bool:
         [sys.executable, "-m", "unittest", "discover", "-s", "tests"],
     )
     for command in commands:
-        result = subprocess.run(command, cwd=work, capture_output=True, timeout=TIMEOUT_S, check=False)
+        try:
+            result = subprocess.run(command, cwd=work, capture_output=True, timeout=TIMEOUT_S, check=False)
+        except subprocess.TimeoutExpired:
+            return True  # A mutant that hangs the suite is detected, not a crash of this script.
         if result.returncode != 0:
             return True
     return False
@@ -111,7 +130,14 @@ def main() -> int:
             print("ERROR: unmutated copy fails its checks; fix them first", file=sys.stderr)
             return 2
         for name, (old, new) in MUTANTS.items():
-            (work / EXAMPLE).write_text(source.replace(old, new), encoding="utf-8")
+            mutated = source.replace(old, new)
+            try:
+                # A mutant that does not compile fails every suite and proves nothing.
+                compile(mutated, str(EXAMPLE), "exec")
+            except SyntaxError as exc:
+                print(f"ERROR: mutant {name!r} is not valid Python: {exc}", file=sys.stderr)
+                return 2
+            (work / EXAMPLE).write_text(mutated, encoding="utf-8")
             detected = run_suites(work)
             print(f"{'KILLED  ' if detected else 'SURVIVED'} {name}")
             if not detected:

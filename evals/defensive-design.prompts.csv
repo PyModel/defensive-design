@@ -78,3 +78,17 @@ test-60,false,Reorder the imports in this Java file alphabetically.
 test-61,false,"In two sentences, what is an idempotency key? No code or design review needed."
 test-62,false,Add type annotations to this trusted internal helper that formats a date for display; no behavior change.
 test-63,false,Update the copyright year in the LICENSE file.
+test-64,true,"Review this deploy script: cd $DIR; rm -rf build/*; curl $URL | tar xz; ./migrate. It has no set options and no quoting."
+test-65,true,"A scheduler computes the next daily run as last_run + 86400 seconds in local time, and rejects tokens by comparing exp with this host's clock exactly. Review it."
+test-66,true,"Our exporter pages a table with OFFSET/LIMIT ordered by created_at while rows are inserted and deleted; customers report skipped and duplicated rows. Fix it."
+test-67,true,"A handler opens a database transaction, calls a partner HTTP API inside it, and after a serialization failure retries only the failed UPDATE. Review it."
+test-68,true,"We call asyncio.create_task(send_receipt(order)) and drop the result; receipt failures never show up anywhere. Make it robust."
+test-69,true,"Review: try: process(f) finally: f.close(); os.remove(tmp). When os.remove fails we lose the original processing error."
+test-70,true,"Our POST /transfer client retries on every httpx.TransportError. Which of ConnectError, ReadTimeout and a connection dropped after the body was sent are safe to retry?"
+test-71,true,"Review this test for our charge-retry fix: it patches client.post with a Mock, calls charge(), and asserts mock.called. Is it sufficient evidence?"
+test-72,true,"You ran our database migration command and the tool call timed out with no output. Continue the task safely."
+test-73,true,"Add a DELETE /projects/{id}/members/{uid} route next to the existing member routes, which all check project-admin permission and rate limits. Make it production-safe."
+test-74,true,"Our agent re-prompts the model until its JSON validates and feeds full tool output back into context every turn. Bound it."
+test-75,false,"In one paragraph, what does set -euo pipefail do? No review needed."
+test-76,false,"Fix the indentation of this shell script; do not change behavior."
+test-77,false,"Sort the keys of this static JSON config fixture alphabetically."

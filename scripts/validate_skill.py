@@ -10,8 +10,11 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import os
 import re
+import subprocess
 import sys
+import unicodedata
 from collections import Counter, deque
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -44,6 +47,13 @@ RUBRIC_ID = re.compile(r"^\|\s*(test-[0-9]+)\s*\|\s*(.+?)\s*\|\s*$", re.MULTILIN
 NEGATIVE_RUBRIC_PREFIX = "Does not invoke the skill"
 # Files a host reads without a Markdown link from SKILL.md.
 UNLINKED_PACKAGE_FILES = {"SKILL.md", "LICENSE", "agents/openai.yaml"}
+MISSING_YAML = (
+    "PyYAML is required: python -m pip install --require-hashes -r requirements-dev.txt"
+)
+# Invisible format characters (bidi overrides, zero-width) can hide instructions
+# from a human reviewer while an agent still reads them.
+HIDDEN_CATEGORIES = {"Cf"}
+TEXT_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".txt", ".json", ".toml", ".sh"}
 HOST_KEYS = {
     "interface": {
         "display_name",
@@ -90,14 +100,17 @@ def read_text(path: Path, root: Path, issues: list[str]) -> str | None:
         if len(raw) > MAX_FILE_BYTES:
             raise ValueError("file exceeds validation size budget")
         return raw.decode("utf-8")
-    except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
+    except OSError as exc:  # Name the file, not an absolute host path.
+        issues.append(f"{label(path, root)}: cannot read: {exc.strerror or exc}")
+        return None
+    except (UnicodeError, ValueError, RuntimeError) as exc:
         issues.append(f"{label(path, root)}: {exc}")
         return None
 
 
 def mapping(text: str, name: str, issues: list[str]) -> dict:
     if yaml_module is None:
-        issues.append("PyYAML is required; install the reviewed requirements-dev.txt")
+        issues.append(MISSING_YAML)
         return {}
     try:
         value = yaml.load(text, Loader=UniqueSafeLoader)
@@ -196,13 +209,23 @@ def check_frontmatter(skill: str, package: Path, issues: list[str]) -> dict:
         issues.append("SKILL.md: missing closed YAML frontmatter")
         return {}
     end = lines.index("---", 1)
+    before = len(issues)
     data = mapping("\n".join(lines[1:end]), "SKILL.md", issues)
+    if len(issues) > before:
+        return {}  # Unparseable frontmatter: field errors would only be noise.
+    if not "\n".join(lines[end + 1 :]).strip():
+        issues.append("SKILL.md: body is empty; add the instructions after the frontmatter")
     allowed = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
-    if set(data) - allowed:
-        issues.append("SKILL.md: unknown frontmatter field")
+    unknown = sorted(str(key) for key in set(data) - allowed)
+    if unknown:
+        issues.append(
+            f"SKILL.md: unknown frontmatter field(s) {', '.join(unknown)}; allowed: {', '.join(sorted(allowed))}"
+        )
     name = data.get("name")
     if not isinstance(name, str) or not 1 <= len(name) <= 64 or not NAME.fullmatch(name):
-        issues.append("SKILL.md: invalid name")
+        issues.append(
+            f"SKILL.md: invalid name {name!r}; use 1-64 lowercase letters, digits and single hyphens"
+        )
     else:
         if package.name != name:
             issues.append("SKILL.md: name must match package directory")
@@ -281,6 +304,16 @@ def package_files(package: Path, issues: list[str]) -> list[Path]:
     return files
 
 
+def check_hidden_characters(path: Path, text: str, root: Path, issues: list[str]) -> None:
+    for number, line in enumerate(text.splitlines(), 1):
+        for ch in line:
+            if unicodedata.category(ch) in HIDDEN_CATEGORIES:
+                issues.append(
+                    f"{label(path, root)}: line {number}: hidden format character U+{ord(ch):04X}; remove it"
+                )
+                return  # One report per file is enough to act on.
+
+
 def validate_package(package: Path) -> tuple[list[str], str | None]:
     """Return errors for one installable package and its declared name."""
     package = package.resolve()
@@ -295,10 +328,14 @@ def validate_package(package: Path) -> tuple[list[str], str | None]:
     files = package_files(package, issues)
     links: dict[Path, set[Path]] = {}
     for path in files:
+        if path.suffix not in TEXT_SUFFIXES and path.name != "LICENSE":
+            continue  # Icons and other binary assets are not text to scan.
+        body = skill if path == skill_path.resolve() else read_text(path, package, issues)
+        if body is None:
+            continue
+        check_hidden_characters(path, body, package, issues)
         if path.suffix == ".md":
-            body = skill if path == skill_path.resolve() else read_text(path, package, issues)
-            if body is not None:
-                links[path.resolve()] = check_links(path, body, package, issues)
+            links[path.resolve()] = check_links(path, body, package, issues)
 
     direct = links.get(skill_path.resolve(), set())
     for folder in ("references", "assets", "scripts"):
@@ -370,6 +407,8 @@ def validate_evals(root: Path, name: str, issues: list[str]) -> None:
 def validate(root: Path) -> list[str]:
     """Return errors without executing examples, accessing the network, or mutating files."""
     root = root.resolve()
+    if yaml_module is None:
+        return [MISSING_YAML]  # Every later check would report misleading metadata errors.
     issues: list[str] = []
     packages = sorted(path.parent for path in (root / "skills").glob("*/SKILL.md"))
     if not packages:
@@ -387,16 +426,62 @@ def validate(root: Path) -> list[str]:
             issues.append(f"{prefix}/LICENSE: must be an identical copy of the repository LICENSE")
         if name is not None:
             validate_evals(root, name, issues)
+        check_changelog(root, package, prefix, issues)
     check_repository_docs(root, issues)
     return issues
 
 
+def check_changelog(root: Path, package: Path, prefix: str, issues: list[str]) -> None:
+    """The packaged version must have its own CHANGELOG section, when a CHANGELOG exists."""
+    changelog = root / "CHANGELOG.md"
+    if not changelog.is_file():
+        return
+    skill = read_text(package / "SKILL.md", root, issues)
+    log = read_text(changelog, root, issues)
+    if skill is None or log is None:
+        return
+    match = re.search(r'^\s+version:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$', skill, re.MULTILINE)
+    if match and not re.search(rf"^## {re.escape(match.group(1))}(?:\s|$)", log, re.MULTILINE):
+        issues.append(
+            f"{prefix}/SKILL.md: version {match.group(1)} has no '## {match.group(1)}' section in CHANGELOG.md"
+        )
+
+
+def git_env() -> dict[str, str]:
+    """Environment for a git child that must act on the repository it is pointed at.
+
+    A hook exports GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE; inherited, they redirect
+    the child to the hook's repository.
+    """
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
+def tracked_markdown(root: Path) -> list[Path] | None:
+    """Markdown files git tracks under root, or None when root is not a git checkout."""
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--", "*.md"],
+            capture_output=True,
+            timeout=30,
+            check=True,
+            env=git_env(),
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    paths = [root / name for name in listing.decode("utf-8", "replace").split("\0") if name]
+    return sorted(path for path in paths if path.is_file())
+
+
 def check_repository_docs(root: Path, issues: list[str]) -> None:
     """Check local links in maintainer Markdown outside the installable packages."""
+    # Prefer the tracked set: virtualenvs, build output and tool state are not ours to lint.
     skipped = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache"}
+    candidates = tracked_markdown(root)
+    if candidates is None:
+        candidates = sorted(root.rglob("*.md"))
     docs = [
         path
-        for path in sorted(root.rglob("*.md"))
+        for path in candidates
         if not skipped.intersection(path.relative_to(root).parts)
         and path.relative_to(root).parts[0] != "skills"
     ]

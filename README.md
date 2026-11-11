@@ -90,14 +90,16 @@ git diff --check
 The package validator checks Agent Skills and documented host metadata rules, local
 links (inline, reference-style and HTML), heading anchors, that every packaged file is
 reachable from `SKILL.md`, the host adapter schema, and the evaluation corpus: matching
-IDs, rubric polarity, duplicate prompts and a 20% negative-case floor. It uses safe
+IDs, rubric polarity, duplicate prompts and a 20% negative-case floor. It also requires a
+CHANGELOG section for the packaged version and rejects hidden format characters in
+packaged files. Repository docs are taken from the git-tracked set. It uses safe
 YAML with duplicate-key rejection and does not fetch links or execute examples from docs.
 It is a project validator, not a complete Markdown parser or model evaluator.
 
-The 56 HTTP reference checks cover bounded and slow-drip reads, per-attempt and
+The 60 HTTP reference checks cover bounded and slow-drip reads, per-attempt and
 operation deadlines, retry classification and budgets, cancellation, breaker transitions,
 input validation, JSON nesting and telemetry. `scripts/mutation_check.py` removes each
-of 13 defensive controls in turn and fails if any removal goes undetected. Separate deterministic tests cover
+of 17 defensive controls in turn and fails if any removal goes undetected. Separate deterministic tests cover
 late synchronous parsing/cleanup at the deadline and malformed package fixtures.
 Seeded generative tests check parser, identifier, JSON-depth and link-confinement
 properties over thousands of inputs, and a surface test pins the documented package
@@ -113,14 +115,25 @@ credentials are not persisted, and job durations and artifact retention are boun
 The source snapshot and environment artifact identify what actually ran. Pinning does
 not constitute a supply-chain audit; operating-system runners remain managed images.
 A separate `audit` workflow runs a hash-locked `pip-audit` on both locks on every change and weekly;
-it reports known advisories and is no defense against a malicious package. Report
+it reports known advisories and is no defense against a malicious package. A weekly
+`links` workflow runs `python -m scripts.check_links` against every cited source; it is
+not a required check because it depends on other sites. Report
 vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
-The corpus has **63 cases: 49 positive, 14 negative**, including Go, Rust, TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
+The corpus has **77 cases: 60 positive, 17 negative**, including Go, Rust, TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
 quality. See the evaluation guide for case-level behavioral testing before claiming
 cross-model or cross-host support.
 
 ## Upgrade and rollback
+
+Version 1.4.0 changes no package path and no `FetchStatus` value. It adds guidance on
+fail-soft defaults, detached-task errors, cleanup masking, shell scripts, time, paging,
+database transactions, transport-phase retry safety, test integrity and the agent's own
+actions. In the illustrative HTTP example the default pool timeout is now half the
+per-attempt timeout, a `pool_timeout_s` equal to `per_attempt_timeout_s` raises
+`ValueError`, and a Retry-After above the local limit is returned to the caller instead
+of dropped. No tag exists yet for any version; until one is published, pin an install
+to a reviewed commit.
 
 Version 1.3.0 moves the installable package to `skills/defensive-design/`. The skill
 name, the install command, and every path inside the package (`references/…`,

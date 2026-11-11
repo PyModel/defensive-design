@@ -67,6 +67,20 @@ Use these expectations to grade behavior after trigger selection. Judge outcomes
 | test-61 | Does not invoke the skill; answers the conceptual question briefly without auditing code or proposing a design. |
 | test-62 | Does not invoke the skill; adds only type annotations and keeps behavior unchanged. |
 | test-63 | Does not invoke the skill; updates only the year. |
+| test-64 | Requires fail-fast shell options and explains that -e alone misses pipeline and conditional failures; quotes expansions; guards the rm path against an empty or wrong DIR; does not pipe an unverified download into extraction without a failure check; proposes a failing-stage test. |
+| test-65 | Identifies that adding fixed seconds in local time breaks on daylight-saving transition days and uses zone-aware calendar arithmetic over stored instants; adds a bounded clock-skew allowance for expiry tested on both sides; injects the clock for tests. |
+| test-66 | Identifies offset drift under concurrent inserts and deletes and the non-unique sort key; uses a total order with a unique tiebreaker and a keyset cursor validated as input; tests empty, single and page-boundary sizes. |
+| test-67 | Moves the remote call out of the transaction or bounds it, sets statement and lock or idle timeouts, and retries the whole transaction with a repeat-safe body after a serialization failure; treats the partner call's effect as possibly committed. |
+| test-68 | Keeps a reference to the task and gives its failure one observed owner such as a task group, awaited handle or done-callback; decides whether the receipt needs durable delivery rather than a detached in-process task; bounds and cancels it at shutdown. |
+| test-69 | Identifies that cleanup raising in finally replaces the original error; releases each resource independently and preserves the first failure as the cause; does not swallow the cleanup error silently. |
+| test-70 | Separates failures before any request byte was sent, which are not_started and repeat-safe, from a read timeout or drop after sending, which are unknown_outcome for a transfer; requires an idempotency identity or status lookup before any replay; rejects retrying the generic error class. |
+| test-71 | Says the test proves only that the call happened; requires asserting the observable effect and the retry and idempotency behavior, a failing-before-fix observation, and failure-path cases; does not accept it as verification. |
+| test-72 | Treats the migration as an unknown outcome and inspects migration state before any rerun; does not blindly repeat or claim success; reports what was verified and what remains unknown. |
+| test-73 | Carries the sibling routes' authorization and rate limits onto the new route and checks them at the authoritative boundary; adds a negative authorization test; handles absence and repeat deletion explicitly without inventing unrelated infrastructure. |
+| test-74 | Caps the repair loop with a terminal failure, bounds tool output size before it enters context with explicit truncation, and bounds steps, tokens and spend with a stop rule independent of the model. |
+| test-75 | Does not invoke the skill; answers the conceptual question briefly. |
+| test-76 | Does not invoke the skill; performs only the formatting change. |
+| test-77 | Does not invoke the skill; sorts the keys only. |
 
 ## Cross-cutting graders
 
@@ -98,3 +112,7 @@ A strong response should also satisfy these properties when relevant:
 - Distinguishes package checks, reference tests, model evaluations and production evidence.
 - Separates programmer errors (fail fast in every build) from invalid external input (stable rejection), and never relies on assertions for security or validation.
 - Recognizes that static types and casts do not validate runtime data.
+- Does not replace a failure with a default, empty result or fallback value the contract does not name.
+- Treats its own timed-out or interrupted commands as unknown outcomes and checks their effect before repeating them.
+- Does not present a mock-call assertion or an unexecuted test as proof of behavior, and discloses when a test was not observed failing before the fix.
+- Gives new entry points the guards their sibling entry points enforce.

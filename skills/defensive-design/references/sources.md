@@ -1,6 +1,6 @@
 # Primary Sources and Applicability
 
-Reviewed on 2026-09-04; the language-semantics rows were checked on 2026-09-22. These anchors support design reasoning, not a
+Reviewed on 2026-09-04; the language-semantics rows were checked on 2026-09-22, and the Bash, PostgreSQL and asyncio task-reference rows on 2026-11-10. These anchors support design reasoning, not a
 claim of certification or universal compatibility. Check platform-specific claims
 against the installed runtime and dependency versions before implementation. Prefer a
 stable final standard over a draft unless the task explicitly targets the draft.
@@ -15,7 +15,7 @@ stable final standard over a draft unless the task explicitly targets the draft.
 | [OWASP AI Agent Security](https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html) | Independent tool policy, untrusted context, bounded authority and execution | Prompt text alone cannot enforce authorization or contain code execution |
 | [Google SRE: Handling Overload](https://sre.google/sre-book/handling-overload/) | Capacity protection, retry budgets and amplification | Use local workload evidence; do not copy example thresholds |
 | [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html) | HTTP idempotency and Retry-After semantics | HTTP-specific; resource semantics and effect certainty still govern recovery |
-| [Python asyncio task documentation](https://docs.python.org/3/library/asyncio-task.html) | Cooperative cancellation, event-loop clock and timeout_at | The illustrative Python example is not hard real-time or CPU preemption |
+| [Python asyncio task documentation](https://docs.python.org/3/library/asyncio-task.html) | Cooperative cancellation, event-loop clock and timeout_at; the event loop keeps only weak references to tasks, so keep a reference to each one | The illustrative Python example is not hard real-time or CPU preemption |
 | [HTTPX timeouts](https://www.python-httpx.org/advanced/timeouts/) | Connect/read/write/pool phase limits; the connect limit also bounds the TLS handshake (httpcore `connection.py` passes the connect timeout to `start_tls`) | Per-phase inactivity limits are not a complete operation deadline |
 | [Python assert statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement) | No code is emitted for `assert` under `-O` | Other runtimes differ; check the project's build flags |
 | [Java assertions guide](https://docs.oracle.com/javase/8/docs/technotes/guides/language/assert.html) | Assertions are disabled at runtime by default | Deployment flags may enable them; do not rely on either for input validation |
@@ -27,6 +27,8 @@ stable final standard over a draft unless the task explicitly targets the draft.
 | [Java Language Specification §4.2.2](https://docs.oracle.com/javase/specs/jls/se21/html/jls-4.html) | Integer operators do not indicate overflow | Use `Math.*Exact` or wider types where the range is reachable |
 | [MDN: `Number.MAX_SAFE_INTEGER`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER) | Integers are exact only up to 2^53 − 1 | Use `BigInt` or a decimal library for larger or exact quantities |
 | [TypeScript handbook: type assertions](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html) | `as` assertions are removed at compile time with no runtime check | Validate runtime data separately from static types |
+| [Bash manual: the set builtin](https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html) | Contexts where `-e` does not exit; `pipefail`; `-u` | Bash-specific; check the shell the script actually runs under |
+| [PostgreSQL: transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html) | Read Committed is the default; after a serialization failure, retry the whole transaction | PostgreSQL-specific; check the engine and version in use |
 | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) | Problem details for HTTP APIs, cited by the failure taxonomy | HTTP-specific; one representation option, not a requirement |
 | [W3C WCAG: Status Messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html) | Accessible presentation of operation states | Apply the relevant platform's accessibility mechanisms; this is not a full accessibility audit |
 | [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use) | Full commit pins, least privilege, untrusted workflow inputs | Pinning is one control, not proof a dependency or workflow is safe |

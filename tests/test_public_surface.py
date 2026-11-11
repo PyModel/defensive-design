@@ -53,5 +53,38 @@ class PublicSurfaceTests(unittest.TestCase):
             self.assertTrue(hasattr(harness.mod, name), name)
 
 
+class DocumentedCountTests(unittest.TestCase):
+    """Counts quoted in the docs must match what the suites actually contain."""
+
+    ROOT = PACKAGE.parents[1]
+
+    def test_quoted_counts_match_reality(self) -> None:
+        import csv
+
+        from scripts import mutation_check
+
+        checks = sum(1 for name in vars(harness) if name.startswith("test_"))
+        with (self.ROOT / "evals" / "defensive-design.prompts.csv").open(newline="") as stream:
+            rows = list(csv.DictReader(stream))
+        positive = sum(row["should_trigger"] == "true" for row in rows)
+        readme = (self.ROOT / "README.md").read_text()
+        guide = (self.ROOT / "evals" / "README.md").read_text()
+        self.assertIn(f"The {checks} HTTP reference checks", readme)
+        self.assertIn(f"the {checks} HTTP reference checks", guide)
+        self.assertIn(f"of {len(mutation_check.MUTANTS)} defensive controls", readme)
+        self.assertIn(
+            f"**{len(rows)} cases: {positive} positive, {len(rows) - positive} negative**", readme
+        )
+
+
+class LinkCheckTests(unittest.TestCase):
+    def test_only_gone_links_fail(self) -> None:
+        from scripts.check_links import classify
+
+        self.assertEqual([classify(code) for code in (200, 301, 404, 410)], ["ok", "ok", "broken", "broken"])
+        # Refusals, server errors and unreachable hosts are not evidence of a dead link.
+        self.assertEqual({classify(code) for code in (401, 403, 429, 500, 503, None)}, {"unverified"})
+
+
 if __name__ == "__main__":
     unittest.main()
