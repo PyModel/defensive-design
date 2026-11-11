@@ -120,14 +120,17 @@ Check only what the contract touches:
   display and records; store instants with an explicit zone/offset; inject the clock
   for tests. Local-time arithmetic breaks on daylight-saving transition days, when a
   local hour is missing or repeated: add calendar units with a zone-aware library,
-  not fixed seconds. Expiry checks across hosts need a bounded clock-skew allowance,
+  not fixed seconds, and choose what a missing or repeated local time resolves to
+  (reject, shift, earlier or later instant), testing both transitions. Expiry checks across hosts need a bounded clock-skew allowance,
   tested on both sides of it.
 - **Text:** define the encoding, normalization form, and case rules that affect
   identity, comparison, length limits, and security decisions.
 - **Collections and paging:** handle empty, single-element and exact-boundary sizes.
   Give paged results a total order with a unique tiebreaker. Offset paging skips or
   repeats rows when the list changes between requests, so a mutable list needs a
-  keyset cursor, validated like any other input.
+  keyset cursor, validated like any other input. A keyset cursor still skips or repeats
+  a row whose sort key changes mid-traversal: sort on an immutable key, or read from a
+  snapshot, when the contract promises every row exactly once.
 
 ## Scripts and CI steps
 

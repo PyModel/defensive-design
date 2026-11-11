@@ -57,7 +57,7 @@ def main() -> int:
         {
             target.split("#", 1)[0]
             for path in files
-            for target in link_targets(path.read_text(encoding="utf-8"))
+            for target in link_targets(path.read_text(encoding="utf-8", errors="replace"))
             if target.startswith("https://")
         }
     )

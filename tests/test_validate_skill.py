@@ -113,18 +113,24 @@ test-02,false,"Fix spelling."
         self.assertEqual(validator.validate(self.repo), [])
 
     def test_untracked_markdown_is_ignored_in_a_git_checkout(self):
+        import os
         import shutil
         import subprocess
 
         if shutil.which("git") is None:
             self.skipTest("git is not installed")
-        subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
-        subprocess.run(["git", "-C", str(self.repo), "add", "-A"], check=True)
+        env = validator.git_env()
+        subprocess.run(["git", "init", "-q", str(self.repo)], check=True, env=env)
+        subprocess.run(["git", "-C", str(self.repo), "add", "-A"], check=True, env=env)
         self.write_repo(".venv311/lib/README.md", "[x](missing.md)\n")
         self.assertEqual(validator.validate(self.repo), [])
         self.write_repo("docs/tracked.md", "[y](missing.md)\n")
-        subprocess.run(["git", "-C", str(self.repo), "add", "docs/tracked.md"], check=True)
-        self.assertIn("docs/tracked.md: 'missing.md': missing local link target", self.errors())
+        subprocess.run(["git", "-C", str(self.repo), "add", "docs/tracked.md"], check=True, env=env)
+        # A hook's exported repository location must not redirect the listing.
+        with patch.dict(os.environ, {"GIT_DIR": str(self.repo / "elsewhere")}):
+            errors = self.errors()
+            self.assertIn("docs/tracked.md: 'missing.md': missing local link target", errors)
+            self.assertNotIn(".venv311", errors)
 
     def test_missing_frontmatter(self):
         self.write("SKILL.md", "# No frontmatter\n")

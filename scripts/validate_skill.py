@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import os
 import re
 import subprocess
 import sys
@@ -446,6 +447,15 @@ def check_changelog(root: Path, package: Path, prefix: str, issues: list[str]) -
         )
 
 
+def git_env() -> dict[str, str]:
+    """Environment for a git child that must act on the repository it is pointed at.
+
+    A hook exports GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE; inherited, they redirect
+    the child to the hook's repository.
+    """
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def tracked_markdown(root: Path) -> list[Path] | None:
     """Markdown files git tracks under root, or None when root is not a git checkout."""
     try:
@@ -454,6 +464,7 @@ def tracked_markdown(root: Path) -> list[Path] | None:
             capture_output=True,
             timeout=30,
             check=True,
+            env=git_env(),
         ).stdout
     except (OSError, subprocess.SubprocessError):
         return None

@@ -114,5 +114,5 @@ A strong response should also satisfy these properties when relevant:
 - Recognizes that static types and casts do not validate runtime data.
 - Does not replace a failure with a default, empty result or fallback value the contract does not name.
 - Treats its own timed-out or interrupted commands as unknown outcomes and checks their effect before repeating them.
-- Does not present a mock-call assertion, or a test never seen failing, as proof of behavior.
+- Does not present a mock-call assertion or an unexecuted test as proof of behavior, and discloses when a test was not observed failing before the fix.
 - Gives new entry points the guards their sibling entry points enforce.
