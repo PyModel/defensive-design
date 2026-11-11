@@ -67,9 +67,11 @@ class ResilienceConfig:
     max_delay_s: float = 2.0
     max_response_bytes: int = 1_000_000
     # httpx applies a bare float to connect, read, write, and pool alike. These
-    # let the slow phases be bounded separately; None means "use the per-attempt
-    # value". httpx cannot split the TLS handshake from connect, so that clause
-    # of the checklist is not applicable here.
+    # let the slow phases be bounded separately. For connect, None means "use the
+    # per-attempt value". For pool, None means half of it: the pool wait must end
+    # strictly before the per-attempt timer, or local saturation is reported as an
+    # upstream timeout and charged to the breaker. httpx cannot split the TLS
+    # handshake from connect, so that clause of the checklist is not applicable here.
     connect_timeout_s: float | None = None
     pool_timeout_s: float | None = None
     # A server may send an arbitrarily large or far-future Retry-After. Reject
@@ -108,13 +110,10 @@ class ResilienceConfig:
             raise ValueError("base_delay_s cannot exceed max_delay_s")
         if self.per_attempt_timeout_s > self.deadline_s:
             raise ValueError("per_attempt_timeout_s cannot exceed deadline_s")
-        if (
-            self.effective_connect_timeout_s > self.per_attempt_timeout_s
-            or self.effective_pool_timeout_s > self.per_attempt_timeout_s
-        ):
-            raise ValueError(
-                "connect_timeout_s and pool_timeout_s cannot exceed per_attempt_timeout_s"
-            )
+        if self.effective_connect_timeout_s > self.per_attempt_timeout_s:
+            raise ValueError("connect_timeout_s cannot exceed per_attempt_timeout_s")
+        if self.effective_pool_timeout_s >= self.per_attempt_timeout_s:
+            raise ValueError("pool_timeout_s must be below per_attempt_timeout_s")
 
         if not isinstance(self.telemetry_key, bytes) or len(self.telemetry_key) < 16:
             raise ValueError("telemetry_key must be at least 16 bytes")
@@ -145,7 +144,7 @@ class ResilienceConfig:
     @property
     def effective_pool_timeout_s(self) -> float:
         return (
-            self.per_attempt_timeout_s
+            self.per_attempt_timeout_s / 2
             if self.pool_timeout_s is None
             else self.pool_timeout_s
         )
@@ -376,8 +375,9 @@ def _parse_retry_after(
     RFC 9110 s10.2.3 permits `delay-seconds` or an HTTP-date, and sets no upper
     bound, so an HTTP-date can be arbitrarily far in the future. Unparseable,
     negative, or non-finite input is discarded. A valid minimum
-    above `max_s` is marked unusable so the caller stops automatic retries
-    instead of retrying earlier than the server allowed.
+    above `max_s` is marked `exceeds_limit` so the caller stops automatic retries
+    instead of retrying earlier than the server allowed. Its value is kept, so
+    the caller can still schedule; only an absurdly long digit string has none.
     """
     if value is None:
         return _RetryAfterHint()
@@ -399,7 +399,7 @@ def _parse_retry_after(
             return _RetryAfterHint(exceeds_limit=True)
         seconds = float(int(digits))
         if seconds > max_s:
-            return _RetryAfterHint(exceeds_limit=True)
+            return _RetryAfterHint(delay_s=seconds, exceeds_limit=True)
         return _RetryAfterHint(delay_s=seconds)
 
     try:
@@ -419,7 +419,7 @@ def _parse_retry_after(
     if not math.isfinite(seconds) or seconds < 0:
         return _RetryAfterHint()
     if seconds > max_s:
-        return _RetryAfterHint(exceeds_limit=True)
+        return _RetryAfterHint(delay_s=seconds, exceeds_limit=True)
     return _RetryAfterHint(delay_s=seconds)
 
 
@@ -694,6 +694,7 @@ async def fetch_user_profile(
                             return FetchResult(
                                 status=FetchStatus.TEMPORARILY_UNAVAILABLE,
                                 error_code="RETRY_AFTER_EXCEEDS_BUDGET",
+                                retry_after_s=hint.delay_s,
                             )
                         retry_after_hint = hint.delay_s
 
@@ -809,6 +810,7 @@ async def fetch_user_profile(
                             return FetchResult(
                                 status=FetchStatus.TEMPORARILY_UNAVAILABLE,
                                 error_code="RETRY_AFTER_EXCEEDS_BUDGET",
+                                retry_after_s=hint.delay_s,
                             )
                         retry_after_hint = hint.delay_s
 
@@ -906,6 +908,15 @@ async def fetch_user_profile(
             # spending the rest of the budget asleep.
             delay = (retry_after_hint or 0.0) + jitter
             if loop.time() + delay >= deadline:
+                logger.warning(
+                    "User fetch retry wait exceeds remaining deadline",
+                    extra={
+                        "request_id": request_id,
+                        "subject": anon_id,
+                        "attempts": attempt,
+                        "error_code": retry_error_code,
+                    },
+                )
                 return FetchResult(
                     status=FetchStatus.TEMPORARILY_UNAVAILABLE,
                     error_code=retry_error_code,

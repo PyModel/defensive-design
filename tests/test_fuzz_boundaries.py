@@ -47,8 +47,9 @@ class RetryAfterProperties(unittest.TestCase):
     def check(self, raw: str | None, max_s: float) -> None:
         hint = mod._parse_retry_after(raw, max_s, now=NOW)
         if hint.exceeds_limit:
-            self.assertIsNone(hint.delay_s, raw)
-        if hint.delay_s is not None:
+            # The server's own value is kept for the caller, never shortened to fit.
+            self.assertTrue(hint.delay_s is None or hint.delay_s > max_s, raw)
+        elif hint.delay_s is not None:
             self.assertTrue(0 <= hint.delay_s <= max_s, raw)
 
     def test_bounded_for_arbitrary_text_digits_and_dates(self) -> None:

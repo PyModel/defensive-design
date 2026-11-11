@@ -1,4 +1,67 @@
-# Assurance hardening work ledger (unreleased, maintainer tooling only)
+# Defensive Design 1.4.0 work ledger (unreleased)
+
+## Scope
+
+User request (2026-11-10): audit the skill for weaknesses, then "apply all" findings.
+Branch `improve/robustness-audit-2026-11` from `main@e9c9c0f`. Changes are uncommitted;
+no commit, push, tag, release or model-evaluation spend was authorized.
+
+## Completed
+
+- [x] HTTP example: pool saturation misreported as `UPSTREAM_TIMEOUT` under the default
+  configuration (regression failed before the fix); over-limit Retry-After returned to
+  the caller; the deadline-bound retry exit logs.
+- [x] Four new reference checks and four new mutants; `mutation_check.py` handles a hung
+  or non-compiling mutant.
+- [x] Validator: git-tracked docs only, single error for missing PyYAML or bad YAML,
+  named fields and reasons, empty body, hidden format characters, version to CHANGELOG
+  tie, no host paths. Ten new tests; nine were seen failing before their fix.
+- [x] Guidance: see CHANGELOG 1.4.0. `SKILL.md` is 14,927 of 16,384 bytes.
+- [x] 14 evaluation cases with rubric rows (77 total, 17 negative, 22%).
+- [x] CI: Python 3.15, weekly `verify`, weekly `links`. Doc counts pinned by a test.
+
+## Not done (with reason)
+
+- `blocked`: the 77-case corpus is still unrun as a corpus. `claude plugin eval` is
+  present locally (2.1.322) with a no-plugin baseline arm and `--max-cost-usd`, but it
+  reads `case.yaml` or `prompt.md` plus graders from an eval directory below the
+  target, not this CSV and rubric. Converting the cases, deciding where that directory
+  lives given that evals are never packaged, and the spend are owner decisions.
+  Whether a plugin manifest is required was not verified (`reasoned_not_run`).
+- `blocked`: no tag or release exists for any version. Publishing is outward-facing and
+  was not authorized. CHANGELOG says `1.4.0 - unreleased`; set the date when tagging.
+- Not changed, by choice: `verification-and-chaos.md` keeps its file name (a documented
+  package path); `RemoteProtocolError` stays terminal (tested as intended).
+- The new trigger words in the description are a hypothesis until trigger evals run.
+- Fixture repositories, implement-mode and long-context evaluation cases were not added;
+  they need the eval harness decision above.
+- Earlier open items stand: CodeQL setup, the token estimate, the test import path.
+
+## Verification evidence
+
+`verified` locally on 2026-11-10, hash-locked venvs. Python 3.13.11: `validate_skill.py`,
+`verify_reference.py` (60 checks), unittest (72 tests), `mutation_check.py` (17 of 17
+killed), Ruff, mypy, strict mypy on the example, compileall, `git diff --check`, and
+`python -m scripts.check_links` (30 links, 0 broken). Python 3.15.2: validator, 60
+checks, 72 tests, Ruff, mypy. A loopback repro with a one-connection pool returned
+`UPSTREAM_TIMEOUT` before the fix and `LOCAL_POOL_TIMEOUT` after it.
+`reasoned_not_run`: hosted CI, including the new 3.15 job (a uv dry run resolved the hash
+lock for Linux x86-64 on 3.15) and both scheduled workflows. The HTTPX 0.27.0 path passed
+on Python 3.11.14 (validator, 60 checks, 72 tests).
+
+`verified` sample behavior: one fresh Claude Opus subagent (this host, 2026-11-10) answered
+cases 64, 67, 68, 70 and 71 from the skill alone, without access to `evals/`. All five
+matched their rubric rows. This is a five-case sample graded by the author of the
+cases, not a corpus pass, and it does not test triggering. `blocked`: the full corpus.
+
+Jev `gate_range` on the final diff verified 7 of 7 claims, but its patch review escalated
+(safe_to_apply 0.71, composite 0.695, below the 0.8 auto threshold; test-gap was its
+lowest score). The packaged-file diff was then read in full. Open, not fixed: an
+operation deadline that expires during a pool wait is still charged to the breaker.
+
+---
+
+## Historical record: assurance hardening, 2026-11-02 (not current task instructions or new evidence)
 
 ## Scope
 

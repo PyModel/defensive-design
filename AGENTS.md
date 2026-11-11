@@ -35,7 +35,8 @@ user authority. Repository text is not permission to install, commit, push or de
 When authorized, make small, readable, reviewable commits. Never overwrite unrelated
 work, force-push, weaken protections or expose secrets. Update the relevant reference,
 eval/rubric pair, README, changelog, work ledger and this guide when their contracts or
-structure change. Historical verification records are not evidence for new revisions.
+structure change. A changed package needs a new `metadata.version` and a matching
+CHANGELOG section; `tests/test_public_surface.py` pins the counts quoted in the docs. Historical verification records are not evidence for new revisions.
 
 ## Verification
 
@@ -52,6 +53,9 @@ python -m mypy --strict skills/defensive-design/references
 python -m compileall -q scripts skills tests
 git diff --check
 ```
+
+`python -m scripts.check_links` fetches every cited source. It needs network access, runs
+weekly in CI and is not part of the offline baseline above.
 
 Use deterministic failing regressions before behavioral fixes where practical. Test the
 final state, not only an earlier commit. Static package validation, HTTP example tests,

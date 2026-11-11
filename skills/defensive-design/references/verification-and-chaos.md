@@ -3,6 +3,8 @@
 Companion to `SKILL.md`. Use when choosing failure-path tests, and for Tier 2 and
 Tier 3 work: what to watch at runtime and what gates a risky rollout or fault experiment.
 
+**Contents:** [Evidence states](#evidence-states) · [Verification matrix](#verification-matrix) · [Test integrity](#test-integrity) · [Failure-path test catalogue](#failure-path-test-catalogue) · [Runtime signals that reveal amplification](#runtime-signals-that-reveal-amplification) · [Fault injection and chaos gates](#fault-injection-and-chaos-gates) · [Rollout and rollback contract](#rollout-and-rollback-contract) · [Evidence limitations](#evidence-limitations)
+
 ## Evidence states
 
 Every verification claim carries one of the four states defined in `SKILL.md` step 5:
@@ -44,6 +46,17 @@ arithmetic may need strong boundary/property tests without any distributed machi
 Prefer deterministic clocks, injected randomness, controllable fakes, and
 synchronization primitives over sleeps. A test that passes by timing luck is not
 evidence.
+
+## Test integrity
+
+A test is evidence only if it can fail for the defect it guards.
+
+- Watch a new regression test fail before the fix, or state that it was not observed failing.
+- Assert the observable effect or the returned contract. A test that only asserts a mock was called proves the call, not the behavior.
+- Fix the general case; production code has no branch that recognises test inputs.
+- Before asserting current behavior, confirm it is the intended behavior. A test that pins a bug keeps it.
+- Cover rejected and failing paths as well as the happy path: null, empty, negative and boundary inputs, and each error branch.
+- For Tier 2/3 changes, prefer review by a fresh context that did not write the change, when the host provides one. The author's tests share the author's blind spots.
 
 ## Failure-path test catalogue
 

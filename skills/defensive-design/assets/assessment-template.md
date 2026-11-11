@@ -17,6 +17,13 @@ an optional output aid, not an executable configuration or mandatory reporting f
 | ID / severity / evidence state | Location and trigger | Invariant and impact | Existing control | Minimal change or explicit non-applicability | Verification |
 |---|---|---|---|---|---|
 
+Severity is the consequence if triggered; state likelihood separately.
+
+- **Critical:** authority, safety, irreversible loss or cross-tenant exposure. Blocks release.
+- **High:** wrong result or durable inconsistency on a plausible trigger.
+- **Medium:** degraded behavior with a bounded, recoverable effect.
+- **Low:** hardening or clarity; no current contract violation.
+
 Describe rejected alternatives and why they add cost without preserving an additional
 needed invariant. Keep confidence separate from executed evidence.
 

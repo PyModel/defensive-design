@@ -728,7 +728,8 @@ async def test_retry_after_above_budget_is_not_shortened():
     result = await run_fetch(handler, config=cfg(max_retry_after_s=2.0))
     assert result.status is mod.FetchStatus.RATE_LIMITED
     assert result.error_code == "RETRY_AFTER_EXCEEDS_BUDGET"
-    assert result.retry_after_s is None
+    # The caller still gets the server's own minimum so it can schedule.
+    assert result.retry_after_s == 99999999.0, result.retry_after_s
 
 
 def test_retry_after_parsing():
@@ -738,7 +739,7 @@ def test_retry_after_parsing():
     assert parse("  12  ", 60).delay_s == 12.0
     # A server minimum above the local budget is rejected, never shortened.
     over = parse("900", 30)
-    assert over.delay_s is None and over.exceeds_limit
+    assert over.delay_s == 900.0 and over.exceeds_limit
     # HTTP-date, both directions, under a fixed clock.
     now = datetime(2026, 1, 1, tzinfo=UTC)
     future = parse(
@@ -758,7 +759,7 @@ def test_retry_after_parsing():
         hint = parse(bad, 60)
         assert hint.delay_s is None and not hint.exceeds_limit, bad
     # A digit string long enough to overflow numeric parsing must reject safely.
-    assert parse("9" * 400, 30).exceeds_limit
+    assert parse("9" * 400, 30) == mod._RetryAfterHint(exceeds_limit=True)
     assert parse("9" * 100_000, 30).exceeds_limit
 
 
@@ -774,7 +775,7 @@ async def test_retry_after_above_budget_stops_automatic_retry():
     assert calls == 1, calls
     assert result.status is mod.FetchStatus.TEMPORARILY_UNAVAILABLE
     assert result.error_code == "RETRY_AFTER_EXCEEDS_BUDGET"
-    assert result.retry_after_s is None
+    assert result.retry_after_s == 3600.0, result.retry_after_s
 
 
 async def test_retry_after_is_honored_over_jitter():
@@ -858,11 +859,11 @@ def test_attempt_timeout_bounds_each_phase_separately():
     ).attempt_timeout()
     assert (timeout.connect, timeout.pool) == (1.0, 0.5)
     assert (timeout.read, timeout.write) == (5.0, 5.0)
-    # Defaults fall back to the per-attempt value.
+    # Defaults fall back to the per-attempt value, except the pool wait, which
+    # must end before the per-attempt timer.
     fallback = cfg(deadline_s=10.0, per_attempt_timeout_s=3.0).attempt_timeout()
-    assert (fallback.connect, fallback.read, fallback.write, fallback.pool) == (
-        3.0,
-    ) * 4
+    assert (fallback.connect, fallback.read, fallback.write) == (3.0,) * 3
+    assert fallback.pool == 1.5
 
 
 def test_config_rejects_pathological_values():
@@ -1106,6 +1107,95 @@ def test_display_text_rejects_invisible_and_separator_characters():
     for ch in ("\u202e", "\u0085", "\u2028", "\u2029", "\u200b", "\x7f", "\n"):
         assert not mod._is_safe_text(f"Al{ch}ice", 100), repr(ch)
     assert mod._is_safe_text("Alice Ångström", 100)
+
+
+class SaturatedPool(httpx.AsyncBaseTransport):
+    """Emulates a full connection pool: wait the pool timeout, then raise PoolTimeout.
+
+    MockTransport has no pool, so it cannot show which timer fires first.
+    """
+
+    async def handle_async_request(self, request):
+        await asyncio.sleep(request.extensions["timeout"]["pool"])
+        raise httpx.PoolTimeout("pool exhausted", request=request)
+
+
+async def test_default_pool_wait_is_shed_before_the_attempt_timer():
+    config = cfg(per_attempt_timeout_s=0.4, max_attempts=1)
+    assert config.effective_pool_timeout_s < config.per_attempt_timeout_s
+    breaker = mod.AsyncCircuitBreaker(failure_threshold=1, reset_timeout_s=10.0)
+    async with httpx.AsyncClient(
+        base_url="https://example.test", transport=SaturatedPool()
+    ) as client:
+        result = await mod.fetch_user_profile(
+            client, breaker, user_id="abc", request_id="req-1", config=config
+        )
+    assert result.status is mod.FetchStatus.OVERLOADED, result
+    assert result.error_code == "LOCAL_POOL_TIMEOUT", result.error_code
+    assert breaker.failure_count == 0 and breaker.state is mod.CircuitState.CLOSED
+    # An explicit pool timeout that ties the attempt timer would lose the same race.
+    try:
+        cfg(per_attempt_timeout_s=0.1, pool_timeout_s=0.1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("pool_timeout_s equal to per_attempt_timeout_s must be rejected")
+
+
+async def test_backoff_delay_is_capped():
+    upper_bounds = []
+
+    async def handler(request):
+        return httpx.Response(503)
+
+    def uniform(low, high):
+        upper_bounds.append(high)
+        return 0.0
+
+    await run_fetch(
+        handler,
+        config=cfg(max_attempts=6, base_delay_s=0.001, max_delay_s=0.002),
+        breaker=mod.AsyncCircuitBreaker(failure_threshold=100, reset_timeout_s=10.0),
+        uniform=uniform,
+    )
+    assert len(upper_bounds) == 5, upper_bounds
+    assert max(upper_bounds) == 0.002, upper_bounds
+
+
+async def test_stale_failure_permit_is_fenced():
+    now = [0.0]
+    breaker = mod.AsyncCircuitBreaker(
+        failure_threshold=1, reset_timeout_s=1.0, clock=lambda: now[0]
+    )
+    stale = await breaker.allow()
+    current = await breaker.allow()
+    assert stale is not None and current is not None
+    await breaker.record_failure(current)  # opens and advances the generation
+    now[0] = 2.0
+    probe = await breaker.allow()
+    assert probe is not None
+    await breaker.record_success(probe)
+    assert breaker.state is mod.CircuitState.CLOSED
+    await breaker.record_failure(stale)  # a late result from before the outage
+    assert breaker.state is mod.CircuitState.CLOSED, breaker.state
+    assert breaker.failure_count == 0, breaker.failure_count
+
+
+class UnreadableBody(httpx.AsyncByteStream):
+    async def __aiter__(self):
+        raise AssertionError("an over-limit declared body must not be read")
+        yield b""
+
+
+async def test_declared_oversize_length_is_rejected_without_reading():
+    async def handler(request):
+        return httpx.Response(
+            200, headers={"content-length": "999999"}, stream=UnreadableBody()
+        )
+
+    result = await run_fetch(handler)
+    assert result.status is mod.FetchStatus.INVALID_PAYLOAD
+    assert result.error_code == "RESPONSE_TOO_LARGE", result.error_code
 
 
 async def main():

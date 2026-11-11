@@ -1,10 +1,11 @@
 ---
 name: defensive-design
-description: Use when explicitly asked for defensive design or robustness, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract. Adapts to any language and any level, from one function or type to modules, applications and distributed systems, using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
+description: Use when explicitly asked for defensive design or robustness, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract, including error handling, retries, timeouts, idempotency, races, validation and edge cases. Adapts to any language and any level, from one function or type to modules, applications and distributed systems, using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
 license: MIT
+compatibility: Markdown-only workflow. The optional HTTP example needs Python 3.11+ and HTTPX 0.27+.
 metadata:
   author: PyModel
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Defensive Design
@@ -92,6 +93,8 @@ write; overload is not a policy denial; an empty result is not a failed query.
 Separate a trusted caller's broken precondition (a bug: fail fast in every build)
 from invalid external input (a stable rejection, never an assertion or crash).
 Use repository-native representations, not a new mandatory error hierarchy.
+A default, empty result or fallback value that replaces a failure is a finding
+unless the contract names it as that outcome.
 Read [failure taxonomy](references/failure-taxonomy.md) when the distinctions matter.
 
 Report any discovered defect with location, triggering scenario, impact, evidence,
@@ -166,6 +169,13 @@ Preserve the existing design and public behavior except for the intended correct
 Prefer a failing regression for a confirmed defect, then the smallest repair. Use
 native formatters, linters, type checks, contract tests, and integration checks. Do not
 weaken tests, error semantics, permissions, or invariants to make a check pass.
+Match sibling code: a new route, handler or job carries the guards, limits and error
+contract its neighbours have, and every symbol, config key and package it names
+exists in the installed version.
+
+Hold your own actions to the same rules. A command or tool call that timed out is an
+`unknown_outcome`: check its effect before repeating it. When a repair fails again,
+stop repeating the approach and report what was tried.
 
 Choose tests by surface: arithmetic boundaries and properties; malformed/oversized input;
 negative authorization; duplicates and races; partial/ambiguous effects; cancellation,

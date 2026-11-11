@@ -68,6 +68,64 @@ test-02,false,"Fix spelling."
     def test_valid_package(self):
         self.assertEqual(validator.validate(self.repo), [])
 
+    def test_unparseable_frontmatter_is_one_error(self):
+        self.change("SKILL.md", "A minimal validation fixture.", "A fixture: with a colon: twice")
+        errors = [line for line in self.errors().splitlines() if "SKILL.md" in line]
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("invalid YAML", errors[0])
+
+    def test_unknown_frontmatter_field_is_named(self):
+        self.change("SKILL.md", "metadata:", "allowed_tools: Read\nmetadata:")
+        self.assertIn("unknown frontmatter field(s) allowed_tools", self.errors())
+
+    def test_invalid_name_states_the_rule(self):
+        self.change("SKILL.md", "name: defensive-design", "name: Defensive_Design")
+        self.assertIn("invalid name 'Defensive_Design'; use 1-64 lowercase", self.errors())
+
+    def test_empty_body_is_reported_directly(self):
+        self.write("SKILL.md", '---\nname: defensive-design\ndescription: x\nmetadata:\n  version: "1.2.0"\n---\n')
+        self.assertIn("SKILL.md: body is empty", self.errors())
+
+    def test_missing_eval_corpus_does_not_leak_host_paths(self):
+        (self.repo / "evals" / "defensive-design.prompts.csv").unlink()
+        errors = self.errors()
+        self.assertIn("evals/defensive-design.prompts.csv: cannot read: No such file", errors)
+        self.assertNotIn(str(self.repo), errors)
+
+    def test_missing_yaml_is_one_actionable_error(self):
+        with patch.object(validator, "yaml_module", None):
+            self.assertEqual(validator.validate(self.repo), [validator.MISSING_YAML])
+
+    def test_hidden_format_characters_are_rejected(self):
+        self.write("references/guide.md", "# Guide\n\nIgnore\u200b this\u202e.\n")
+        self.assertIn("references/guide.md: line 3: hidden format character U+200B", self.errors())
+
+    def test_binary_asset_is_not_read_as_text(self):
+        (self.root / "assets").mkdir()
+        (self.root / "assets" / "icon.png").write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe")
+        self.change("SKILL.md", "[Guide](references/guide.md)", "[Guide](references/guide.md) ![icon](assets/icon.png)")
+        self.assertEqual(validator.validate(self.repo), [])
+
+    def test_version_requires_a_changelog_section(self):
+        self.write_repo("CHANGELOG.md", "# Changelog\n\n## 1.1.0 - 2026-01-01\n")
+        self.assertIn("version 1.2.0 has no '## 1.2.0' section", self.errors())
+        self.write_repo("CHANGELOG.md", "# Changelog\n\n## 1.2.0 - 2026-02-01\n")
+        self.assertEqual(validator.validate(self.repo), [])
+
+    def test_untracked_markdown_is_ignored_in_a_git_checkout(self):
+        import shutil
+        import subprocess
+
+        if shutil.which("git") is None:
+            self.skipTest("git is not installed")
+        subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "add", "-A"], check=True)
+        self.write_repo(".venv311/lib/README.md", "[x](missing.md)\n")
+        self.assertEqual(validator.validate(self.repo), [])
+        self.write_repo("docs/tracked.md", "[y](missing.md)\n")
+        subprocess.run(["git", "-C", str(self.repo), "add", "docs/tracked.md"], check=True)
+        self.assertIn("docs/tracked.md: 'missing.md': missing local link target", self.errors())
+
     def test_missing_frontmatter(self):
         self.write("SKILL.md", "# No frontmatter\n")
         self.assertIn("frontmatter", self.errors())

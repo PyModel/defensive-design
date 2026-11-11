@@ -10,6 +10,8 @@ ownership, `code-level-design.md` for function/type/module design, `failure-taxo
 for classification, `secure-coding-overlay.md` for security-sensitive boundaries, and
 `verification-and-chaos.md` for failure-path tests, runtime signals and rollout gates.
 
+**Contents:** [Deadlines and Timeouts](#deadlines-and-timeouts) · [Retries](#retries) · [Circuit Breakers and Load Shedding](#circuit-breakers-and-load-shedding) · [Idempotency and Effect-Once Writes](#idempotency-and-effect-once-writes) · [Ambiguous Outcomes and Partial Success](#ambiguous-outcomes-and-partial-success) · [Concurrency and Shared State](#concurrency-and-shared-state) · [Capacity, Bounds, and Backpressure](#capacity-bounds-and-backpressure) · [Policy Limits](#policy-limits) · [Cancellation and Shutdown](#cancellation-and-shutdown) · [Errors and Degradation](#errors-and-degradation) · [Untrusted Input and Trust Boundaries](#untrusted-input-and-trust-boundaries) · [Caches](#caches) · [Queues, Workers, and Webhooks](#queues-workers-and-webhooks) · [Model, Tool, and Agent Boundaries](#model-tool-and-agent-boundaries) · [Observability](#observability) · [Local Computation, UI, and Platform Boundaries](#local-computation-ui-and-platform-boundaries)
+
 ## Deadlines and Timeouts
 
 - [ ] Does the operation have an overall deadline, set by the caller or inherited from one?
@@ -36,6 +38,8 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Are server retry hints such as `Retry-After` treated as minimums, never shortened, combined with bounded jitter, and rejected for automatic retry when they exceed the local budget?
 - [ ] Are permanent failures (validation, denied authority, unsupported protocol, configuration) excluded from retry, with absence handled according to the dependency contract?
 - [ ] Does retry behavior avoid amplifying load during a dependency-wide outage?
+- [ ] Is there a retry budget shared across calls, such as retries held to a bounded share of first attempts derived from this system's capacity, so retrying stops when most calls are failing?
+- [ ] Can the request be sent again at all? A consumed stream, a one-shot body or a partly read response must be rebuilt, or the operation restarted from a known point.
 
 ## Circuit Breakers and Load Shedding
 
@@ -78,6 +82,9 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Does the protected resource itself reject writes carrying a fence below the current generation? A token that nothing checks is decorative — lease expiry does not inform the paused holder.
 - [ ] Are lock hold times bounded, and is remote I/O kept out of critical sections where possible?
 - [ ] Is deadlock avoided by consistent acquisition order or by lock timeouts?
+- [ ] For database work, are statement and idle-in-transaction timeouts set, so a stuck transaction cannot hold locks indefinitely?
+- [ ] Is the isolation level known rather than assumed? Defaults differ by engine, and PostgreSQL's default, Read Committed, does not prevent a lost update from read-modify-write.
+- [ ] After a serialization failure or deadlock, is the whole transaction retried from the start with a repeat-safe body, not only the failed statement?
 - [ ] Within one process, can another thread, task, callback, or `await`/yield point run between a check and the action that depends on it? Re-check after resuming or make the transition atomic.
 
 ## Capacity, Bounds, and Backpressure
@@ -117,6 +124,7 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Is the internal cause preserved for diagnosis while the external error stays stable and non-sensitive?
 - [ ] Is there any path that returns ordinary success after an unhandled internal failure?
 - [ ] For each broad catch: does it classify, record, convert, compensate, degrade, or re-raise? A broad catch that only continues is a defect.
+- [ ] Can a background task, callback or detached job fail without any owner observing it?
 - [ ] For each fallback: does it preserve the same authorization, tenancy, privacy, and integrity constraints as the primary path?
 - [ ] Is the fallback bounded, explicitly labelled in the result, observable in telemetry, tested, and recoverable?
 - [ ] Is degraded output kept out of caches, or cached under distinct semantics with conservative expiry and explicit metadata?
@@ -125,7 +133,7 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 ## Untrusted Input and Trust Boundaries
 
 For data reaching an interpreter, privileged API, durable store, filesystem, outbound
-network request, model, or tool, also apply `references/secure-coding-overlay.md`.
+network request, model, or tool, also apply the [secure coding overlay](secure-coding-overlay.md).
 
 - [ ] Is authority checked at the authoritative boundary, before expensive or privileged work?
 - [ ] Is the same authorization applied unchanged on retry, cache-hit, fallback, replay, and recovery paths?
@@ -164,6 +172,10 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 - [ ] Do destructive, privileged, or irreversible tool actions require approval bound to the exact resolved action and arguments?
 - [ ] Is retrieved or fetched content prevented from escalating privilege or redirecting the agent's authority?
 - [ ] Are partial, refused, truncated, and failed model outcomes distinguished from empty success?
+- [ ] Is the repair loop for invalid structured output capped, with a terminal failure after the cap?
+- [ ] Is tool and retrieval output bounded in size before it enters context, with truncation made explicit?
+- [ ] Are writes to persistent memory or shared context validated and attributable, so injected content cannot steer later sessions?
+- [ ] Does a delegated sub-agent receive no more authority, budget or data than its task needs, and is its report treated as untrusted?
 
 ## Observability
 
@@ -178,8 +190,8 @@ network request, model, or tool, also apply `references/secure-coding-overlay.md
 ## Local Computation, UI, and Platform Boundaries
 
 For function, type and module design — invariant ownership, programmer errors versus
-input errors, parsing at the boundary and resource ownership — use
-`references/code-level-design.md`.
+input errors, parsing at the boundary, resource ownership, scripts and paging — use
+[code-level design](code-level-design.md).
 
 - [ ] Are units, overflow, precision, rounding, NaN/infinity, empty values and complexity checked where they affect the contract?
 - [ ] Are resource and synchronization controls native to the actual process, device or deployment boundary, rather than copied from a distributed service?

@@ -5,6 +5,8 @@ when a defect lives in how code is shaped rather than in a remote dependency. Th
 design questions answered with the language's native facilities, not a mandate to add
 types, wrappers, or checks to trusted local code.
 
+**Contents:** [Choose the level that owns the invariant](#choose-the-level-that-owns-the-invariant) · [Separate caller bugs from operational outcomes](#separate-caller-bugs-from-operational-outcomes) · [Parse once at the boundary](#parse-once-at-the-boundary) · [Make invalid states unrepresentable, proportionally](#make-invalid-states-unrepresentable-proportionally) · [Own resources and effects explicitly](#own-resources-and-effects-explicitly) · [Concurrency inside one process](#concurrency-inside-one-process) · [Numbers, time, and text](#numbers-time-and-text) · [Scripts and CI steps](#scripts-and-ci-steps) · [Design interfaces that are hard to misuse](#design-interfaces-that-are-hard-to-misuse) · [Verify at this level](#verify-at-this-level)
+
 ## Choose the level that owns the invariant
 
 A control belongs at the lowest level that owns every participant in the invariant.
@@ -79,6 +81,17 @@ a type hierarchy for a local value with two call sites.
   force-unwrap (`!`, `!!`) or `Optional.get()` on a fallible value in library code
   converts a recoverable outcome into silent corruption or an unexplained crash for
   the caller.
+- Detached work owns its errors too. Keep a reference to every background task,
+  promise, thread or goroutine, and give it one place where its failure is observed:
+  an awaited handle, a task group, an error channel, or a top-level handler. Python's
+  event loop keeps only weak references to tasks, and a rejection nobody awaits
+  reaches no caller.
+- Cleanup must not replace the original error. A `finally`, `defer`, destructor or
+  error handler that raises or returns can mask the failure that triggered it. Release
+  each resource independently and keep the first error as the cause.
+- Report a failure once. Log it at the layer that handles it; everywhere else pass it
+  upward with its cause attached (`raise ... from`, `%w`, a wrapped cause). Logging
+  and rethrowing at every layer produces duplicate alerts with no owner.
 
 ## Concurrency inside one process
 
@@ -105,9 +118,32 @@ Check only what the contract touches:
 - **Floating point:** handle NaN, infinity, signed zero, and tolerance-based comparison.
 - **Time:** use a monotonic clock for durations and deadlines, wall-clock time only for
   display and records; store instants with an explicit zone/offset; inject the clock
-  for tests.
+  for tests. Local-time arithmetic breaks on daylight-saving transition days, when a
+  local hour is missing or repeated: add calendar units with a zone-aware library,
+  not fixed seconds. Expiry checks across hosts need a bounded clock-skew allowance,
+  tested on both sides of it.
 - **Text:** define the encoding, normalization form, and case rules that affect
   identity, comparison, length limits, and security decisions.
+- **Collections and paging:** handle empty, single-element and exact-boundary sizes.
+  Give paged results a total order with a unique tiebreaker. Offset paging skips or
+  repeats rows when the list changes between requests, so a mutable list needs a
+  keyset cursor, validated like any other input.
+
+## Scripts and CI steps
+
+A shell script is code with weak defaults: it continues after a failed command and
+expands an unset variable to nothing.
+
+- Start Bash scripts with `set -euo pipefail`. `-e` alone does not exit on a failure
+  in an `if`/`while` test, in an `&&`/`||` list before its last command, or in any
+  pipeline stage but the last; `pipefail` covers the pipeline case.
+- Quote every expansion (`"$var"`, `"$@"`). An unquoted value splits on spaces and
+  expands globs, turning one path into several arguments.
+- Register cleanup with `trap ... EXIT` so failure paths remove temporary state.
+- Before `rm`, `mv` or a deleting sync, check that the path variable is non-empty and
+  inside the intended directory.
+- Verify by running once with a failing first pipeline stage and once with a path
+  containing a space.
 
 ## Design interfaces that are hard to misuse
 

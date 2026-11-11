@@ -1,6 +1,61 @@
 # Changelog
 
-## Unreleased (maintainer tooling only; the installable package is unchanged)
+## 1.4.0 - unreleased
+
+### Added (skill guidance)
+
+- `SKILL.md`: a default or fallback that replaces a failure is a finding; new code matches
+  its siblings' guards and names only symbols, keys and packages that exist; the agent's
+  own timed-out commands are unknown outcomes, and a repeated failed repair stops. The
+  description names its trigger topics and `compatibility` states the example's runtime.
+- `references/code-level-design.md`: detached-task errors, cleanup that masks the original
+  error, reporting a failure once, daylight-saving and clock-skew cases, collections and
+  paging, and a section on shell scripts and CI steps.
+- `references/failure-taxonomy.md`: transport phase decides `not_started` versus
+  `unknown_outcome`.
+- `references/defensive-checklists.md`: shared retry budget, non-replayable requests,
+  database timeouts, isolation level and whole-transaction retry, unobserved background
+  failures, and four model-boundary items.
+- `references/verification-and-chaos.md`: a test-integrity section.
+- `references/secure-coding-overlay.md`: sibling entry-point guards.
+- `assets/assessment-template.md`: a four-level severity scale.
+- A contents line in every reference longer than 100 lines; two source rows.
+- 14 evaluation cases (11 positive, 3 negative) and four cross-cutting graders.
+
+### Fixed (illustrative HTTP example)
+
+- With the default configuration the pool wait and the per-attempt timer were equal, and
+  the per-attempt timer fired first. Local pool saturation was reported as
+  `UPSTREAM_TIMEOUT` and charged to the breaker. The default pool timeout is now half the
+  per-attempt timeout, and an explicit `pool_timeout_s` must be below it.
+- A Retry-After above `max_retry_after_s` was dropped. The result now carries the
+  server's value in `retry_after_s` with `RETRY_AFTER_EXCEEDS_BUDGET`; automatic retry
+  still stops.
+- The exit taken when a retry wait cannot fit the deadline now logs, like retry exhaustion.
+
+### Maintenance
+
+- Reference checks grew from 56 to 60 and targeted mutants from 13 to 17. The new ones
+  cover the backoff cap, the stale failure permit, the declared-length fast path and the
+  pool default. `mutation_check.py` treats a hung mutant as detected and rejects a mutant
+  that does not compile.
+- Validator: repository docs come from the git-tracked set; a missing PyYAML or
+  unparseable frontmatter is one error; unknown fields and invalid names are named; an
+  empty body, hidden format characters and a version without a CHANGELOG section are
+  rejected; read errors no longer print host paths. Validator tests grew from 44 to 54.
+- `tests/test_public_surface.py` pins the counts quoted in README and the evaluation guide.
+- CI: Python 3.15 in the matrix, a weekly `verify` run, and a weekly `links` workflow
+  (`scripts/check_links.py`).
+
+### Compatibility
+
+Skill name, install command, package paths and `FetchStatus` values are unchanged.
+Observable changes in the example: the default pool timeout is half
+`per_attempt_timeout_s`; `pool_timeout_s >= per_attempt_timeout_s` raises `ValueError`
+(equality was accepted before); `retry_after_s` is set on `RETRY_AFTER_EXCEEDS_BUDGET`
+results when the header parsed.
+
+The entries below were made earlier in this cycle and touch maintainer tooling only.
 
 ### Security
 

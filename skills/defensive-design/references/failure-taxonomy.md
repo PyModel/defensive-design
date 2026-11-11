@@ -3,6 +3,8 @@
 Use this reference when a failure is hard to classify, several outcomes collapse
 into one return value, or a contract crosses a process or service boundary.
 
+**Contents:** [Use Several Axes, Not One Error Enum](#use-several-axes-not-one-error-enum) · [Default Decisions](#default-decisions) · [Repeat Safety](#repeat-safety) · [Policy Limit Versus Overload](#policy-limit-versus-overload) · [Failure Envelope](#failure-envelope) · [Expressing It Over HTTP](#expressing-it-over-http)
+
 ## Use Several Axes, Not One Error Enum
 
 A single event can be overloaded, partially committed, and unsafe to retry. Record
@@ -69,6 +71,13 @@ For an automatic transport retry, all applicable answers must be yes:
 Conflict compare-and-retry and same-identity replay or reconciliation after an unknown
 outcome are semantic recovery, not automatic transport retry. They still require one
 owner, an attempt/deadline budget, and effect-once protection.
+
+Transport phase bounds effect certainty when the client reports it reliably. A failure
+before any request byte was sent (name resolution, connection refused, connect or pool
+timeout) is `not_started` and repeat-safe even for a write. Once any part of the request
+may have been sent (a read timeout, a reset, a dropped connection), the effect is
+`unknown_outcome`. A generic transport-error class usually mixes both; classify the
+specific errors.
 
 Operation names are not proof. A lookup may be repeat-safe, but a "read" that dequeues,
 leases, bills, marks state, or advances a cursor is effectful. An HTTP method supplies

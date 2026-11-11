@@ -11,7 +11,7 @@ metadata, and exact trigger/rubric case correspondence. Its Markdown support is 
 inline link and ATX heading format used in this repository, not a general Markdown
 parser. It does not fetch URLs or execute repository commands from documentation.
 
-Run `python scripts/verify_reference.py` for the 56 HTTP reference checks and
+Run `python scripts/verify_reference.py` for the 60 HTTP reference checks and
 `python -m unittest discover -s tests -v` for deadline and validator regression tests.
 These establish package/example properties, not model behavior.
 
