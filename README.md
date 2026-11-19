@@ -10,9 +10,10 @@ and agents without prescribing their implementation stack.
 
 It combines the responsibilities of a **Senior Software Architect, Staff Engineer and
 Engineering Manager**: choose justified boundaries, enforce contracts, verify failure
-paths, and make delivery and operational ownership explicit. Version **1.5.0** broadens
-architecture decisions, interface contracts, identity/build security and recovery
-planning while preserving the portable skill name and existing reference paths.
+paths, and make delivery and operational ownership explicit. Version **1.6.0** makes that workflow smaller and measurable: a task-first core,
+on-demand architecture/security/operations references, reproducible behavior evidence,
+implementation fixtures and bounded maintenance tooling. It preserves the portable
+skill name and existing reference paths.
 
 ## Use and install
 
@@ -109,7 +110,8 @@ git diff --check
 The package validator checks Agent Skills and documented host metadata rules, local
 links (inline, reference-style and HTML), heading anchors, that every packaged file is
 reachable from `SKILL.md`, the host adapter schema, and the evaluation corpus: matching
-IDs, rubric polarity, duplicate prompts and a 20% negative-case floor. It also requires a
+IDs, rubric polarity, duplicate prompts and a 20% negative-case floor. The core has a
+12 KiB project budget; the full references load only for relevant tasks. It also requires a
 CHANGELOG section for the packaged version and rejects hidden format characters in
 packaged files. Repository docs are taken from the git-tracked set. It uses safe
 YAML with duplicate-key rejection and does not fetch links or execute examples from docs.
@@ -118,7 +120,7 @@ It is a project validator, not a complete Markdown parser or model evaluator.
 The 60 HTTP reference checks cover bounded and slow-drip reads, per-attempt and
 operation deadlines, retry classification and budgets, cancellation, breaker transitions,
 input validation, JSON nesting and telemetry. `scripts/mutation_check.py` removes each
-of 17 defensive controls in turn and fails if any removal goes undetected. Separate deterministic tests cover
+of 18 defensive controls in turn and fails if any removal goes undetected. Separate deterministic tests cover
 late synchronous parsing/cleanup at the deadline and malformed package fixtures.
 Seeded generative tests check parser, identifier, JSON-depth and link-confinement
 properties over thousands of inputs, and a surface test pins the documented package
@@ -129,23 +131,49 @@ policies remain caller-owned integration boundaries.
 
 CI retains the `Reference regression checks (3.11)` through `(3.15)` job names,
 uses a hash-locked test baseline, runs Ruff and mypy, and separately exercises minimum HTTPX 0.27.0 and a bounded
-latest-0.x compatibility canary. Action revisions are pinned, token access is read-only,
+latest-0.x compatibility canary. Action revisions are pinned; verification uses read-only token access,
 credentials are not persisted, and job durations and artifact retention are bounded.
 The source snapshot and environment artifact identify what actually ran. Pinning does
 not constitute a supply-chain audit; operating-system runners remain managed images.
 A separate `audit` workflow runs a hash-locked `pip-audit` on both locks on every change and weekly;
-it reports known advisories and is no defense against a malicious package. A weekly
-`links` workflow runs `python -m scripts.check_links` against every cited source; it is
-not a required check because it depends on other sites. Report
+it reports known advisories and is no defense against a malicious package. A separate pinned `CodeQL (Python)` job uses security-extended analysis for maintained
+Python code, with only the security-event upload permission added. Intentionally faulty
+fixtures and archived evaluation snapshots are excluded. A weekly `links` workflow runs
+`python -m scripts.check_links --budget 90 --json report.json` against cited sources
+with bounded child processes and explicit verified/broken/unverified outcomes; exit zero
+means no proven dead links. It is not required because it depends on other sites. Report
 vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 The corpus has **100 cases: 78 positive, 22 negative**, including architecture selection,
 API/event evolution, identity and build boundaries, durable recovery, and Go, Rust,
 TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
-quality. See the evaluation guide for case-level behavioral testing before claiming
-cross-model or cross-host support.
+quality. The [evaluation guide](evals/README.md) includes executable implementation
+fixtures, a model-independent evidence harness, complete captured answers, independent
+grades, trigger decisions and a no-skill comparison. It states the evaluated host and
+actual limitations; format portability is not a cross-model performance claim.
+
+### Context efficiency
+
+The 1.6.0 core is **11,947 bytes and 1,385 whitespace-delimited words**, down from
+16,097 bytes and 2,121 words in 1.5.0. With `tiktoken==0.12.0`, its `o200k_base` count
+fell from **3,156 to 2,346 tokens** (25.7%); `cl100k_base` fell from 3,178 to 2,358.
+These are exact counts for named public encodings, not measured runtime cost or the
+host model's undisclosed token accounting. Routing preserves detailed references while
+avoiding unconditional loading. See the evaluation record for reproducible measurements.
+
+From another directory, tests support an explicit repository top level:
+
+```bash
+python -m unittest discover -s /absolute/repository/tests -t /absolute/repository -v
+```
 
 ## Upgrade and rollback
+
+Version 1.6.0 preserves all supported paths and result types, condenses the core, adds
+evaluation/maintenance tooling and caps HTTP pool acquisition by the remaining operation
+budget. Existing check names and hash-locked application/example dependencies remain
+unchanged. The tests package now supports explicit top-level discovery from any working
+directory. No application schema or infrastructure migration is introduced.
 
 Version 1.5.0 is an additive guidance update: it preserves every previous package path
 and `FetchStatus` value and adds two on-demand references. The Python HTTP example,

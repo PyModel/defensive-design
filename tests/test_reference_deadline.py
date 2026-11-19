@@ -68,6 +68,66 @@ class DeadlineCompletionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(result.status, harness.mod.FetchStatus.CANCELLED)
         self.assertIsNone(result.data)
 
+    async def test_retry_pool_wait_is_bounded_by_remaining_operation_budget(self):
+        loop = asyncio.get_running_loop()
+        real_time = loop.time
+        elapsed = [0.0]
+        calls = []
+        breaker = harness.mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=10.0)
+
+        class RetryThenSaturatedPool(httpx.AsyncBaseTransport):
+            async def handle_async_request(self, request):
+                calls.append(request.extensions["timeout"]["pool"])
+                if len(calls) == 1:
+                    return httpx.Response(503)
+                await asyncio.sleep(request.extensions["timeout"]["pool"])
+                raise httpx.PoolTimeout("pool exhausted", request=request)
+
+        async def advance_backoff(_delay):
+            # Leave less than the configured pool timeout for the next attempt.
+            elapsed[0] += 0.9
+
+        config = harness.cfg(deadline_s=1.0, per_attempt_timeout_s=0.4)
+        with patch.object(loop, "time", side_effect=lambda: real_time() + elapsed[0]):
+            async with httpx.AsyncClient(
+                base_url="https://example.test", transport=RetryThenSaturatedPool(), trust_env=False
+            ) as client:
+                result = await harness.mod.fetch_user_profile(
+                    client, breaker, user_id="abc", request_id="req-1", config=config,
+                    sleep=advance_backoff, uniform=lambda _low, _high: 0.0,
+                )
+        self.assertEqual(len(calls), 2)
+        self.assertLess(calls[1], 0.1)
+        self.assertEqual(result.error_code, "LOCAL_POOL_TIMEOUT")
+        self.assertIs(result.status, harness.mod.FetchStatus.OVERLOADED)
+        # Only the first attempt's actual 503 is a dependency failure.
+        self.assertEqual(breaker.failure_count, 1)
+        self.assertIs(breaker.state, harness.mod.CircuitState.CLOSED)
+
+    async def test_expired_budget_before_io_does_not_charge_dependency(self):
+        loop = asyncio.get_running_loop()
+        clock = [loop.time()]
+        original = harness.mod.pseudonymize
+        calls = []
+        breaker = harness.mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=10.0)
+
+        def slow_local_preparation(user_id, key):
+            clock[0] += 2.0
+            return original(user_id, key)
+
+        async def handler(request):
+            calls.append(request)
+            return httpx.Response(200, json={"display_name": "Alice"})
+
+        with (
+            patch.object(loop, "time", side_effect=lambda: clock[0]),
+            patch.object(harness.mod, "pseudonymize", side_effect=slow_local_preparation),
+        ):
+            result = await harness.run_fetch(handler, breaker=breaker, config=harness.cfg(deadline_s=1.0))
+        self.assertEqual(calls, [])
+        self.assertEqual(result.error_code, "DEADLINE_EXCEEDED")
+        self.assertEqual(breaker.failure_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

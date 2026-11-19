@@ -1,7 +1,7 @@
 # Repository maintenance
 
 This repository distributes a portable Agent Skills package, not a general-purpose
-resilience library. Keep the core short and architecture-neutral. Load detailed
+resilience library. Keep the core within 12 KiB and architecture-neutral. Load detailed
 references on demand. Do not add infrastructure merely to exemplify a design pattern.
 
 ## Structure and compatibility
@@ -16,8 +16,12 @@ Only `skills/defensive-design/` is installed; installers copy that whole directo
 - `skills/defensive-design/assets/`: optional assessment template.
 - `skills/defensive-design/agents/`: optional host adapter; the core must not depend on it.
 - `skills/defensive-design/LICENSE`: identical copy of the root LICENSE.
-- `evals/`: trigger cases, behavior rubric and evaluation procedure. Never package them;
-  a rubric installed next to the skill contaminates behavioral evaluation.
+- `evals/`: trigger cases, behavior rubric, implementation fixtures and captured evidence.
+  Never package them; a rubric installed next to the skill contaminates evaluation.
+  Executors receive raw tasks and starters, never labels or graders. Preserve raw answers
+  before independent grading. `scripts/evaluate_skill.py` validates exact snapshot hashes,
+  complete IDs and evidence quotations; it does not judge correctness by keywords.
+  Archived results describe their snapshot, model, batching and isolation limits.
 - `scripts/`, `tests/`, `pyproject.toml`, `requirements-dev.*`, `requirements-audit.*`: maintainer checks.
 - `tasks/todo.md`: current work evidence and clearly separated historical records.
 
@@ -57,8 +61,14 @@ python -m compileall -q scripts skills tests
 git diff --check
 ```
 
-`python -m scripts.check_links` fetches every cited source. It needs network access, runs
-weekly in CI and is not part of the offline baseline above.
+`python -m scripts.check_links --budget 90 --json report.json` fetches cited sources
+with a whole-run budget and child cleanup. It needs network access, runs weekly in CI
+and is not part of the offline baseline above. Exit zero means no proven broken URLs;
+unverified links remain explicit. CodeQL scans maintained Python, excluding intentionally
+buggy fixture starters and archived evaluation snapshots.
+
+From an unrelated working directory use `python -m unittest discover -s /absolute/repo/tests
+-t /absolute/repo -v`. Do not add ad hoc import-path mutation to each test file.
 
 Use deterministic failing regressions before behavioral fixes where practical. Test the
 final state, not only an earlier commit. Static package validation, HTTP example tests,

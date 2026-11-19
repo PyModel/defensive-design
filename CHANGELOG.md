@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.6.0 - unreleased
+
+### Changed
+
+- Condensed the task-first core to a 12 KiB maintenance budget, preserving the
+  architect, staff engineer and engineering manager responsibilities, all invariant
+  families, supported reference paths and on-demand detailed guidance.
+- Replaced the serial external-link sweep with bounded concurrent child processes,
+  per-link and whole-run deadlines, transient-only retries and explicit JSON evidence
+  for verified, broken and unverified URLs.
+
+### Added
+
+- Model-independent evaluation preparation and evidence validation, separate raw
+  inputs and judging material, exact snapshot hashes, trigger confusion matrices and
+  paired with-skill/no-skill outcomes. No keyword-based quality scoring is used.
+- Executable payment-recovery and object-authorization implementation fixtures with
+  separate graders. Evaluation evidence remains outside the installed package.
+- Pinned, least-privilege CodeQL analysis of Python tooling and the shipped example.
+- Test-package discovery from arbitrary working directories with an explicit
+  repository top-level directory.
+
+### Fixed
+
+- A retry could enter a local connection-pool wait longer than the remaining operation
+  deadline and charge that local saturation to the dependency breaker. Each attempt
+  now caps pool acquisition against the remaining budget; expired local preparation
+  starts no I/O. Added failing-before-fix regression coverage and a targeted mutant.
+
+### Compatibility and evidence
+
+The skill name, existing packaged paths, public HTTP result types and protected CI
+check names are preserved. The HTTP example's pool timeout may shorten near its
+operation deadline. No application migration is introduced. See the evaluation
+record and work ledger for executed checks, comparisons and their actual limits.
+
 ## 1.5.0 - unreleased
 
 ### Added

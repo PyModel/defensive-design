@@ -36,7 +36,11 @@ MUTANTS: dict[str, tuple[str, str]] = {
         '                retry_error_code = "UPSTREAM_TIMEOUT"',
         '                probe_resolved = True\n                retry_error_code = "UPSTREAM_TIMEOUT"',
     ),
-    "phase timeouts sent": ("                    timeout=config.attempt_timeout(),\n", ""),
+    "phase timeouts sent": ("                    timeout=attempt_timeout,\n", ""),
+    "pool wait respects remaining operation budget": (
+        "                attempt_timeout.pool = min(config.effective_pool_timeout_s, remaining_s / 2)\n",
+        "",
+    ),
     "unresolved probe released": (
         "                if not probe_resolved:\n                    await breaker.release_probe(permit)",
         "                pass",
