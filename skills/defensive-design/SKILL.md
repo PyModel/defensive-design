@@ -1,11 +1,11 @@
 ---
 name: defensive-design
-description: Use when explicitly asked for defensive design or robustness, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract, including error handling, retries, timeouts, idempotency, races, validation and edge cases. Adapts to any language and any level, from one function or type to modules, applications and distributed systems, using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
+description: Use when explicitly asked for defensive design, robustness, production readiness or architecture tradeoffs, or when designing, implementing, reviewing, or debugging code whose inputs, arithmetic, state, dependencies, timing, resources, or authority can violate a meaningful contract, including error handling, retries, timeouts, idempotency, races, validation, migrations and edge cases. Adapts to any language and any level, from one function or type to modules, applications and distributed systems, using evidence and proportional controls. Do not auto-trigger for routine low-risk formatting, renaming, documentation, or trusted fixture edits; an explicit request still applies a minimal review.
 license: MIT
 compatibility: Markdown-only workflow. The optional HTTP example needs Python 3.11+ and HTTPX 0.27+.
 metadata:
   author: PyModel
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # Defensive Design
@@ -13,6 +13,10 @@ metadata:
 Build the smallest evidence-backed design that preserves its contract under material
 failures. Adapt the controls to the system, not the system to a resilience checklist.
 This is a portable reasoning workflow, not a universal implementation or certification.
+
+Operate as a Senior Software Architect, Staff Engineer, and Engineering Manager:
+connect design tradeoffs to enforced contracts, executable evidence, delivery ownership,
+and safe operation. Production readiness is an evidence-backed decision, not a label.
 
 ## 1. Establish scope and authority
 
@@ -25,11 +29,12 @@ Identify the requested mode before acting:
 | Implement | Complete authorized, in-scope changes and tests; report remaining gaps. |
 | Incident | Preserve evidence, contain harm within granted authority, and separate mitigation from root-cause repair. |
 
-Implementation permission is not deployment, production fault-injection, dependency
-installation, publication, commit, or push permission. Follow the user's granted scope
-and repository contribution policy. Never overwrite unrelated changes, force-push, or
-weaken protection to complete a task. Prefer small, readable, independently reviewable
-commits when commits are authorized.
+Infer authorized actions from the user's request, session and repository contribution
+policy; complete necessary reversible work without repeated confirmation. Respect
+explicit no-edit/no-install/no-publish limits. Deployment, destructive operations and
+production fault injection need applicable authority; this skill grants none. Never
+overwrite unrelated changes, force-push, or weaken protection. Keep authorized commits
+small, readable and independently reviewable.
 
 Read applicable repository instructions, contracts, manifests, architecture notes,
 neighboring code, and tests. Resolve conflicts with higher-priority instructions first;
@@ -56,6 +61,11 @@ Before choosing controls, establish only the facts material to the task:
   backlog age, cost, and recovery objectives justified by this system's needs.
 - **Existing facilities:** native types, errors, validation, synchronization, lifecycle,
   transactions, retries, security, telemetry, tests, and deployment mechanisms.
+
+Before significant implementation, state assumptions, quality targets, chosen boundaries,
+tradeoffs, blast radius, compatibility, ownership and verification/rollout plan. Compare
+the existing design and a simpler alternative. Use measurable scenarios and revisit
+triggers; do not require every architectural pattern. Small fixes need only a short note.
 
 Use the optional [assessment template](assets/assessment-template.md) only when the
 task warrants it; step 4 routes each surface to its reference.
@@ -126,8 +136,8 @@ Apply these invariants to the actual failure surfaces:
    reporting timely success; use an appropriate isolation/resource policy when actual
    enforcement is required. Cancellation does not undo a committed external effect.
 4. **Retry only with a safety proof.** One automatic transport-retry owner, explicit
-   transient classification, repeat-safe semantics, capped attempts and jittered
-   backoff, remaining deadline, and an overload budget. Never shorten a server minimum
+   transient classification, repeat-safe semantics, capped attempts and exponential
+   backoff with jitter, remaining deadline, and an overload budget. Never shorten a server minimum
    delay to squeeze in a retry. Unknown outcomes need status lookup, same-identity
    replay, or reconciliation, not blind repetition or a fresh idempotency key.
 5. **Enforce state invariants where state is owned.** Use the native atomic/transactional
@@ -148,7 +158,8 @@ Apply these invariants to the actual failure surfaces:
    reports, and audit records with allowlisting, redaction, bounded cardinality, and
    injection-safe encoding. An approval is bound to the exact action, not a generic yes.
 9. **Preserve lifecycle and compatibility.** Propagate cancellation, release owned
-   resources, handle restart/crash gaps, and preserve committed state. Define old/new
+   resources, handle restart/crash gaps, and preserve committed state and durable
+   obligations when an attempt expires. Define old/new
    reader and writer compatibility before evolving durable or public contracts.
 
 Load only the reference that owns the surface in front of you:
@@ -156,6 +167,8 @@ Load only the reference that owns the surface in front of you:
 | Surface | Reference |
 |---|---|
 | Function, type, module or library interface; programmer errors; resource ownership | [code-level design](references/code-level-design.md) |
+| Choosing or changing boundaries, architecture styles, data stores or ownership | [architecture decisions](references/architecture-decisions.md) |
+| API, event, cache, asynchronous operation, frontend or offline-client contract | [interface contracts](references/interface-contracts.md) |
 | Unfamiliar, hybrid, local, offline, device, data or infrastructure execution model | [architecture adaptation](references/architecture-adaptation.md) |
 | Several outcomes collapse into one result; retry or effect certainty is unclear | [failure taxonomy](references/failure-taxonomy.md) |
 | Tier 2/3 control, or a control you have not applied before | [defensive checklists](references/defensive-checklists.md), marking non-applicable surfaces with a reason |
@@ -206,7 +219,8 @@ from risks and hypotheses. State inspection coverage and what remains unknown.
 **Design or implementation:** state the chosen architecture-preserving approach,
 rejected unnecessary mechanisms, dependencies, ordered reviewable slices, acceptance
 criteria, tests, observable signals, migration/compatibility, rollout gates, rollback or
-reconciliation, and remaining risks. Mark items not applicable with a reason. For small
+reconciliation, blast radius, operational owner, assumptions and remaining risks.
+Mark items not applicable with a reason. For small
 changes, a few sentences and actual test results are enough.
 
 Stop an unsafe action when authority is missing, a critical invariant is violated, or

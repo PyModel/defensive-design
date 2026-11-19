@@ -41,9 +41,9 @@ class hierarchy.
 | `permanent_dependency` | Configuration, protocol, authentication, schema, or other failure unlikely to change during this operation | Fail fast; no retry |
 | `unknown_outcome` | An effect may or may not have committed | Status lookup, same-identity replay, or reconciliation; never blind repeat |
 | `partial_success` | Some intended effects committed | Explicit per-item/effect state plus compensation or reconciliation |
-| `stale_work` | Deadline, TTL, lease, or version passed; work is no longer useful | Drop or cancel rather than consume capacity |
+| `stale_work` | Attempt deadline, TTL, lease, or version no longer permits this execution | Stop the stale attempt; drop only contractually expirable work, preserving durable obligations and uncertain effects for recovery |
 | `degraded` | A bounded fallback returned lower-fidelity service | Label it, preserve critical invariants, observe it, and recover |
-| `cancelled` | Caller or system abandoned the operation | Propagate cancellation and release owned resources |
+| `cancelled` | Caller or system abandoned this execution | Propagate cancellation and release owned resources; preserve committed or uncertain effects and any durable recovery obligation |
 | `failed` | Operation ended without a more specific caller result | Return stable failure; preserve the cause; do not infer retryability |
 | `invariant_violation` | Impossible, corrupt, or security-sensitive state observed | Stop the unsafe path; preserve evidence; quarantine or escalate |
 | `contract_violation` | A trusted internal caller broke a documented precondition (a bug, not hostile input) | Fail fast in every build; do not retry, degrade, or report it as caller-input `invalid` |
@@ -83,6 +83,12 @@ Operation names are not proof. A lookup may be repeat-safe, but a "read" that de
 leases, bills, marks state, or advances a cursor is effectful. An HTTP method supplies
 useful protocol semantics, but the resource contract, effect certainty, and any
 idempotency protection still determine the safe action.
+
+Separate the lifetime of an attempt from the lifetime of the business obligation.
+A timed-out checkout can still have charged, and a lost lease can leave reconciliation
+unfinished. Stop the expired or fenced executor; keep durable pending state for an
+authorized owner to resolve. An attempt deadline does not authorize forgetting money,
+deleting evidence, or acknowledging unfinished mandatory work.
 
 ## Policy Limit Versus Overload
 

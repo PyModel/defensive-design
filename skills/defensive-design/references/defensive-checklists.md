@@ -16,6 +16,7 @@ for classification, `secure-coding-overlay.md` for security-sensitive boundaries
 
 - [ ] Does the operation have an overall deadline, set by the caller or inherited from one?
 - [ ] Is the remaining budget propagated to every downstream call, rather than each layer starting a fresh full-length timer?
+- [ ] Is elapsed time measured with the runtime's monotonic clock? Across hosts, is the deadline protocol's clock-skew behavior understood and the received budget clamped to local policy, without passing a process-local clock value as a portable timestamp?
 - [ ] Are connect, pool-acquisition, TLS handshake, read, and write bounded separately where the client supports it, or is it documented why the client cannot split them? (httpx, for example, shares one value between TCP connect and the TLS handshake.)
 - [ ] When retries are justified, do per-attempt limits leave enough useful budget, without adding retries to operations that do not need them?
 - [ ] Are streaming and long-poll reads bounded by an idle timeout, not only a total timeout?
@@ -29,17 +30,25 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 
 ## Retries
 
-- [ ] Is exactly one layer in the call chain responsible for retrying this operation?
+- [ ] Is there one automatic transport-retry owner for each dependency operation, with separately bounded transaction recovery and durable-job redelivery?
 - [ ] Have nested retries across SDK, client wrapper, service, proxy, and worker been checked for multiplication?
 - [ ] For automatic transport retry, is the failure contract-defined as transient rather than merely caught as an exception? Are conflict retry and unknown-outcome replay handled as explicit semantic recovery instead?
 - [ ] Is the operation repeat-safe by contract, or protected by idempotency, regardless of whether its name says read, write, GET, or POST?
 - [ ] Is there a maximum attempt count *and* a deadline check, so retries stop on whichever comes first?
-- [ ] Does the backoff cap its delay and include jitter?
+- [ ] Does the backoff grow exponentially to a cap with jitter, using the dependency's supported policy where available? Are total attempts (including the first) distinguished from additional retries?
 - [ ] Are server retry hints such as `Retry-After` treated as minimums, never shortened, combined with bounded jitter, and rejected for automatic retry when they exceed the local budget?
 - [ ] Are permanent failures (validation, denied authority, unsupported protocol, configuration) excluded from retry, with absence handled according to the dependency contract?
 - [ ] Does retry behavior avoid amplifying load during a dependency-wide outage?
 - [ ] Is there a retry budget shared across calls, such as retries held to a bounded share of first attempts derived from this system's capacity, so retrying stops when most calls are failing?
 - [ ] Can the request be sent again at all? A consumed stream, a one-shot body or a partly read response must be rebuilt, or the operation restarted from a known point.
+
+For a justified custom policy, full jitter can sample a delay uniformly from zero to
+`min(cap, base * 2**retry_index)`, with the first retry indexed at zero. Saturate before
+overflow, validate finite positive configuration, and use injected randomness in tests.
+This bounds the delay, not the total work: attempt count, deadline and shared retry budget
+still apply. Respect a server minimum delay even when it exceeds the local backoff cap;
+if that delay and a useful attempt cannot fit the remaining deadline, stop the automatic
+retry. Recheck cancellation, budget and remaining time after waiting and before sending.
 
 ## Circuit Breakers and Load Shedding
 
@@ -58,6 +67,7 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Is the key claimed atomically with the state transition (unique constraint, conditional insert, or transaction), not checked-then-written?
 - [ ] Are the in-progress, completed, failed, expired, and abandoned states all defined and reachable?
 - [ ] What happens when a process crashes between claiming the key and committing the effect? Is there a reconciliation or expiry path for that gap?
+- [ ] Does expiry distinguish a definitely uncommitted reservation from a possibly completed external effect? Expiring a lease or key must not authorize a fresh effect while the original outcome is unknown.
 - [ ] Is deduplication state retained at least as long as the duplicate-delivery and retry window?
 - [ ] For effects in another system, is there an outbox, inbox, saga, provider idempotency key, or reconciliation job?
 - [ ] If an outbox is used, is the consumer also idempotent or backed by an inbox ledger? The relay can republish after a crash between publish and mark-published, so the producer-side fix alone is incomplete.
@@ -74,14 +84,14 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 
 ## Concurrency and Shared State
 
-- [ ] Is every read-modify-write sequence protected by a transaction, unique constraint, compare-and-swap, lock, or lease?
+- [ ] Is each shared read-modify-write invariant protected by an atomic operation, sufficient transaction isolation/constraint, compare-and-swap, lock, or properly fenced lease covering all participants?
 - [ ] Does enforcement cover all owners of the state, rather than relying on timing? Process-local locks or actors may suffice for exclusively local state; shared durable state needs a mechanism covering all writers.
 - [ ] Is parallelism bounded overall and per contended key?
 - [ ] Are connections, sessions, clients, transactions, and file handles used within their documented ownership and thread- or task-safety rules?
 - [ ] Where a stale lease holder can still mutate the resource, is there enforced fencing, a generation check, or an equivalent conditional operation?
 - [ ] Does the protected resource itself reject writes carrying a fence below the current generation? A token that nothing checks is decorative — lease expiry does not inform the paused holder.
 - [ ] Are lock hold times bounded, and is remote I/O kept out of critical sections where possible?
-- [ ] Is deadlock avoided by consistent acquisition order or by lock timeouts?
+- [ ] Is lock acquisition ordered consistently where possible, with deadlock detection or bounded waits and a full rollback/recovery path? A timeout bounds a wait; it does not prove deadlocks cannot occur.
 - [ ] For database work, are statement and idle-in-transaction timeouts set, so a stuck transaction cannot hold locks indefinitely?
 - [ ] Is the isolation level known rather than assumed? Defaults differ by engine, and PostgreSQL's default, Read Committed, does not prevent a lost update from read-modify-write.
 - [ ] After a serialization failure or deadlock, is the whole transaction retried from the start with a repeat-safe body, not only the failed statement?
@@ -94,12 +104,14 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 - [ ] Is recursion depth bounded, and is unbounded recursion converted to iteration where it can be driven by input?
 - [ ] Is memory bounded for streaming, buffering, and accumulation paths, rather than reading an entire response into memory?
 - [ ] Is the age of the oldest useful work bounded, not only queue depth? Depth can look healthy while nothing queued is still worth processing.
-- [ ] Is work that has passed its deadline, TTL, lease, or version dropped rather than processed?
+- [ ] Is an obsolete or expired attempt stopped only when the contract permits expiry, while committed or ambiguous effects and durable business obligations remain tracked for reconciliation or transfer to a valid owner?
 - [ ] Is backpressure applied before saturation, with deliberate rejection, deferral, sampling, or shedding?
 - [ ] Do rejected requests receive a clear signal (status, retry hint) so callers do not hot-loop?
 - [ ] Can the fallback or failover target absorb the traffic that would be redirected to it?
 - [ ] For each recovery mechanism — retry, replay, failover, cache rebuild, backlog drain, autoscaling — does it add work to an already-failing system, and what bounds that work? Overload can sustain itself after its original trigger is gone.
 - [ ] Under sustained overload, is there a path that reduces optional work, stops retries, and sheds stale requests, rather than only queueing harder?
+- [ ] Are expensive tenants, hot keys, and bulk/background work isolated enough to protect critical paths, with bounded fairness and capacity reserved for essential recovery where needed?
+- [ ] Are autoscaling and worker limits constrained by downstream connection pools, quotas, partitions and cost, rather than increasing callers into a fixed bottleneck?
 
 ## Policy Limits
 
@@ -113,9 +125,9 @@ not an arbitrary total lifetime. Pure helpers need none of these I/O controls.
 ## Cancellation and Shutdown
 
 - [ ] Is cancellation propagated to downstream calls rather than being caught and treated as an ordinary failure?
-- [ ] On cancellation, are owned resources released and partially-applied state either committed consistently or rolled back?
+- [ ] On cancellation, are owned resources released, local transactions committed consistently or rolled back, and external committed/unknown effects preserved for reconciliation?
 - [ ] On shutdown: does the process stop accepting new work, stop spawning children, drain or checkpoint in-flight work within a deadline, release leases, and close resources?
-- [ ] Does readiness flip before the drain begins, so traffic stops arriving?
+- [ ] Is new admission disabled and readiness withdrawn before draining, allowing for routing propagation and existing connections that may still deliver work?
 - [ ] Is a hard-kill path considered — can the system restart cleanly from whatever state a `SIGKILL` leaves behind?
 
 ## Errors and Degradation
@@ -136,7 +148,7 @@ For data reaching an interpreter, privileged API, durable store, filesystem, out
 network request, model, or tool, also apply the [secure coding overlay](secure-coding-overlay.md).
 
 - [ ] Is authority checked at the authoritative boundary, before expensive or privileged work?
-- [ ] Is the same authorization applied unchanged on retry, cache-hit, fallback, replay, and recovery paths?
+- [ ] Do retry, cache-hit, fallback, replay and recovery preserve the required authority boundary? Recheck current permission for revocable user-delegated work; use the explicit service authority and accepted-operation policy for an already durable obligation, rather than either granting new user rights or silently abandoning required settlement.
 - [ ] Are shape, type, size, count, encoding, and semantic ranges validated, not just parsed?
 - [ ] Are tenancy and scope derived from verified authoritative context rather than from request-supplied fields?
 - [ ] Is dependency output — including from internal services — validated before it affects state or privilege?
@@ -157,9 +169,10 @@ network request, model, or tool, also apply the [secure coding overlay](secure-c
 - [ ] Is acknowledgement deferred until the required durable effect or checkpoint is complete?
 - [ ] Is the consumer safe against redelivery — deduplication, idempotent effect, or a transactional inbox?
 - [ ] Are visibility timeout or lease duration longer than realistic processing time, and is the lease extended for long work?
-- [ ] Is there a maximum attempt count with dead-lettering, and is the dead-letter queue monitored and drainable?
+- [ ] Are processing attempts and elapsed work bounded, with exhaustion routed to a bounded, monitored quarantine or explicit terminal result? For durable obligations, is there an accountable reconciliation owner, retention policy and replay procedure instead of silent deletion?
 - [ ] Is poison-message handling defined, so one bad payload cannot stall the partition or the worker pool?
 - [ ] Where ordering matters, is it actually guaranteed by the transport and preserved by the consumer's concurrency model?
+- [ ] Are event identity, entity version and ordering scope distinct, with gap, late-arrival and replay behavior defined? Replaying a quarantine must retain deduplication identity and revalidate the current execution policy.
 - [ ] Is the raw webhook body preserved, with any verification key selected only from trusted routing context or a strictly validated key id, before payload fields are trusted or any side effect occurs?
 - [ ] Is webhook delivery deduplicated using the provider contract, with signature, replay-window and timestamp rules where that protocol provides them?
 - [ ] Does the webhook endpoint respond within the provider's timeout, deferring slow work to a durable queue?
@@ -186,6 +199,10 @@ network request, model, or tool, also apply the [secure coding overlay](secure-c
 - [ ] Are degradation, fallback, shed, retry-exhaustion, breaker-open, and dead-letter events all countable?
 - [ ] Are privileged and irreversible effects audited where policy requires it, with append-only semantics?
 - [ ] Does readiness reflect the ability to serve safely, and liveness avoid restarting a healthy process during a dependency outage?
+- [ ] Can telemetry failure block, exhaust resources or hide a required audit? Bound exporter buffers and decide explicitly which audit writes are part of a critical transaction versus best-effort diagnostics.
+
+For SLO definitions, alert ownership, recovery exercises and migration gates, use
+[verification and rollout](verification-and-chaos.md).
 
 ## Local Computation, UI, and Platform Boundaries
 

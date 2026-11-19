@@ -8,6 +8,12 @@ single function or type to modules, applications and distributed systems. It ada
 and mobile apps, services, streams, data pipelines, infrastructure, embedded components,
 and agents without prescribing their implementation stack.
 
+It combines the responsibilities of a **Senior Software Architect, Staff Engineer and
+Engineering Manager**: choose justified boundaries, enforce contracts, verify failure
+paths, and make delivery and operational ownership explicit. Version **1.5.0** broadens
+architecture decisions, interface contracts, identity/build security and recovery
+planning while preserving the portable skill name and existing reference paths.
+
 ## Use and install
 
 The skill itself is Markdown. It does **not** require Python, HTTPX, a database, a cloud,
@@ -33,6 +39,7 @@ Example requests:
 ```text
 Use $defensive-design to review this code. Report findings only; do not edit.
 Use $defensive-design to design safe recovery without changing our architecture.
+Use $defensive-design to compare architecture options against our workload, team and production constraints.
 Use $defensive-design to implement this fix and its regression tests. Do not deploy.
 ```
 
@@ -46,8 +53,11 @@ Consequence determines depth; a critical pure calculation does not thereby need 
 |---|---|
 | Scope and evidence first | Distinguish review, design, implementation and incident work. Inspect contracts and code; report unknowns and conflicts instead of inventing repository facts. |
 | Adapt before prescribing | Identify state ownership, authority, lifecycle, consequence and resource bounds. Reuse native facilities; justify every extra mechanism. |
+| Choose architecture by evidence | Separate code organization, deployment topology and state patterns. Compare the existing design and simpler alternatives against measurable quality, cost and ownership needs. |
 | Preserve meaningful outcomes | Keep result, cause, effect certainty, policy and retry decisions separate. A timeout may follow a committed effect. |
 | Bound recovery | Control retries, queues, stale work, fallback and reconciliation without causing secondary overload. |
+| Preserve durable obligations | Stop expired attempts without forgetting committed or uncertain effects. Restore and replay account for payments and other effects outside the restored database. |
+| Establish release readiness | State assumptions, tradeoffs, blast radius, mixed-version compatibility, user-outcome signals, release/recovery gates and accountable owners. |
 | Respect execution semantics | Local locks may be correct; streams may be long-lived; cooperative cancellation is not CPU preemption; physical safe states follow approved hazard requirements. |
 | Prove only what was checked | Record actual commands and scope. Package structure, HTTP example tests, model evaluations and production behavior are distinct evidence. |
 
@@ -58,6 +68,8 @@ Consequence determines depth; a critical pure calculation does not thereby need 
 | [SKILL.md](skills/defensive-design/SKILL.md) | Concise workflow, trigger metadata, invariants and on-demand routing |
 | [Code-level design](skills/defensive-design/references/code-level-design.md) | Invariant ownership by level, programmer versus input errors, boundary parsing, resource ownership, numbers/time/text |
 | [Architecture adaptation](skills/defensive-design/references/architecture-adaptation.md) | Capability profile and context-specific decisions without a fixed architecture |
+| [Architecture decisions](skills/defensive-design/references/architecture-decisions.md) | Quality scenarios, conditional pattern choices, dependency/state ownership, data tradeoffs and decision records |
+| [Interface contracts](skills/defensive-design/references/interface-contracts.md) | API/event/schema evolution, async operations, concurrency, cache consistency and web/mobile/offline state |
 | [Assessment template](skills/defensive-design/assets/assessment-template.md) | Optional findings, implementation slices, evidence, migration and rollback record |
 | [Failure taxonomy](skills/defensive-design/references/failure-taxonomy.md) | Multi-axis result/cause/effect model and repeat-safety decision |
 | [Defensive checklists](skills/defensive-design/references/defensive-checklists.md) | Controls selected by actual failure surfaces |
@@ -68,6 +80,13 @@ Consequence determines depth; a critical pure calculation does not thereby need 
 | [Evaluation guide](evals/README.md) | Maintainer-only: static checks versus actual agent behavioral evaluation (not installed) |
 | [Maintenance guide](AGENTS.md) | Contribution, evidence and compatibility discipline |
 | [Changelog](CHANGELOG.md) | Revision changes and migration notes |
+
+Architecture coverage includes cohesive modules/modular monoliths, layered and vertical
+slices, ports/adapters and clean/onion boundaries, independent services, queue/workers,
+event-driven collaboration, CQRS, event sourcing, local transactions/outbox/inbox/sagas,
+serverless, pipelines and extension isolation. These are conditional options, not a
+claim to enumerate every architecture or a requirement to combine them. Details load
+only when the changed surface needs them.
 
 ## Maintainer verification
 
@@ -108,7 +127,7 @@ The reference rejects late completion but cannot preempt blocking CPU/native wor
 DNS, TLS, proxies, real provider behavior and application-specific transport/logging
 policies remain caller-owned integration boundaries.
 
-CI preserves the required `Reference regression checks (3.11)` through `(3.14)` names,
+CI retains the `Reference regression checks (3.11)` through `(3.15)` job names,
 uses a hash-locked test baseline, runs Ruff and mypy, and separately exercises minimum HTTPX 0.27.0 and a bounded
 latest-0.x compatibility canary. Action revisions are pinned, token access is read-only,
 credentials are not persisted, and job durations and artifact retention are bounded.
@@ -120,11 +139,20 @@ it reports known advisories and is no defense against a malicious package. A wee
 not a required check because it depends on other sites. Report
 vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
-The corpus has **77 cases: 60 positive, 17 negative**, including Go, Rust, TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
+The corpus has **100 cases: 78 positive, 22 negative**, including architecture selection,
+API/event evolution, identity and build boundaries, durable recovery, and Go, Rust,
+TypeScript, Java, C, Python and Kubernetes code-level cases. CI checks its structure, not agent
 quality. See the evaluation guide for case-level behavioral testing before claiming
 cross-model or cross-host support.
 
 ## Upgrade and rollback
+
+Version 1.5.0 is an additive guidance update: it preserves every previous package path
+and `FetchStatus` value and adds two on-demand references. The Python HTTP example,
+application dependencies and protected CI check names are unchanged. The offline URL
+property test now ignores host proxy/CA environment settings, which otherwise made it
+fail before any request was sent. The work ledger separates new verification from
+historical claims; the expanded corpus is not itself a full model-evaluation result.
 
 Version 1.4.0 changes no package path and no `FetchStatus` value. It adds guidance on
 fail-soft defaults, detached-task errors, cleanup masking, shell scripts, time, paging,

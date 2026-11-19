@@ -81,6 +81,29 @@ Use these expectations to grade behavior after trigger selection. Judge outcomes
 | test-75 | Does not invoke the skill; answers the conceptual question briefly. |
 | test-76 | Does not invoke the skill; performs only the formatting change. |
 | test-77 | Does not invoke the skill; sorts the keys only. |
+| test-78 | Compares the existing modular design and smallest improvement against stated quality and ownership needs. Does not prescribe a distributed stack merely because it is requested as best; explains costs, boundaries, evidence and revisit triggers. |
+| test-79 | Allows separate command/query handlers or models over the existing store; messaging, separate stores and event sourcing remain optional and need independent justification. States consistency and maintenance costs if separation is chosen. |
+| test-80 | Identifies shared write authority and coordinated-release coupling; does not equate deployment count with independence. Establishes owned data, interfaces and dependency rules before extraction, or justifies consolidation. |
+| test-81 | Compares an ordinary protected audit trail with event sourcing and its authoritative-history, schema, projection, retention and replay costs. Prevents historical replay from repeating external effects or resurrecting required deletions. |
+| test-82 | Accepts evidence for separate worker/process or stronger sandbox isolation; does not impose a monolith rule. Defines bounded acceptance, resources, authority, backpressure and recovery, with provider/runtime assumptions and measurable verification. |
+| test-83 | Records mandatory work durably before acknowledgement, distinguishes accepted from completed, protects operation status/result by authority, makes duplicate submission repeat-safe and defines cancellation versus committed effects. |
+| test-84 | Rejects the claim that new-server parsing or additive enum syntax proves compatibility. Checks both producer/consumer directions, unknown enum behavior, persisted/replayed data and supported clients; gates contraction and rollback on evidence. |
+| test-85 | Stops the expired executor without deleting the durable obligation; preserves unknown effect and stable identity, fences stale writes, and reconciles before replay or admitting a new effect. Lease/key expiry does not establish non-commit. |
+| test-86 | Distinguishes a revocable delegated export from an accepted service obligation. Requires current export authority and scoped worker authority/intent for reconciliation; neither blindly carries user privileges forward nor deletes mandatory work after revocation. |
+| test-87 | Separates browser and native client profiles; no confidential shared secret in distributed apps. Uses supported transaction-bound code/PKCE, registered redirect rules and refresh replay/race protection; verifies provider capabilities instead of inventing them. |
+| test-88 | Binds destination policy to actual connections and permitted hops, including redirects, DNS changes and IPv4/IPv6; uses controlled egress for arbitrary public fetches, contains credentials and bounds responses/expansion/time/retries. |
+| test-89 | Does not execute or deploy. Treats fork code/cache/artifacts as untrusted; checks expected source, artifact digest, builder identity and allowed build policy instead of trusting any signature. Separates untrusted verification from privileged promotion. |
+| test-90 | Addresses the stale-refill race with a version/conditional/invalidation mechanism or explicit acceptable staleness. Authorizes cache hits, includes relevant identity in keys, and bounds rebuild load; does not claim TTL solves strong consistency or revocation. |
+| test-91 | Separates acceptance from user-visible completion/freshness and missing telemetry. Identifies shared DDL blast radius despite a small canary; requires representative per-version evidence, compatibility, stop criteria and safe recovery before expansion. |
+| test-92 | Gates resumed effects until external payments and missing dedup state are reconciled or repeat safety established. Includes revocation/deletion, keys/config, destination capacity and measured recovery evidence; never blindly recharges pending rows. |
+| test-93 | Marks workload/targets/ownership as unknown and proposes bounded measurement and owner decisions. May state explicit provisional assumptions, but never invents evidence or universal thresholds or declares readiness while material gates are unverified. |
+| test-94 | Preserves intermediate and unknown compensation state; does not treat a saga as an isolated rollback or timeout as no refund. Uses stable recovery identities, bounded retries and reconciliation/operational ownership, with invariant-specific acceptance criteria. |
+| test-95 | Inspects actual DDL locks/rewrites, defines a mixed-version/client/replay matrix, bounded resumable backfill and concurrent-write handling, verifies data, and contracts only after support/retention/rollback conditions permit. |
+| test-96 | Does not invoke the skill; gives only the requested short conceptual explanation. |
+| test-97 | Does not invoke the skill; translates faithfully without an unsolicited audit. |
+| test-98 | Does not invoke the skill; changes only spelling and Markdown alignment. |
+| test-99 | Does not invoke the skill; sorts the glossary only. |
+| test-100 | Does not invoke the skill; changes heading capitalization only. |
 
 ## Cross-cutting graders
 
@@ -116,3 +139,11 @@ A strong response should also satisfy these properties when relevant:
 - Treats its own timed-out or interrupted commands as unknown outcomes and checks their effect before repeating them.
 - Does not present a mock-call assertion or an unexecuted test as proof of behavior, and discloses when a test was not observed failing before the fix.
 - Gives new entry points the guards their sibling entry points enforce.
+- Separates code organization, execution/deployment topology, and state/interaction patterns; does not present them as mutually exclusive or mandatory.
+- Connects significant architecture choices to quality scenarios, ownership, operating cost, evidence and revisit conditions; permits justified distribution and simpler local designs alike.
+- Makes assumptions, tradeoffs, blast radius, compatibility and observability explicit before substantial implementation.
+- Preserves durable obligations after attempt deadlines, lease loss, retry exhaustion or uncertain external effects.
+- Distinguishes current user delegation from accepted service obligations while enforcing each one's authority at execution.
+- Checks compatibility across supported clients, stored data and retained replay, not only current-server schema tests.
+- Measures asynchronous completion or freshness separately from acceptance and does not let availability budgets excuse security or correctness violations.
+- Treats restore and rollback as cross-system recovery, including effects and authority that a database snapshot cannot undo.
