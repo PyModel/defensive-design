@@ -186,6 +186,11 @@ python -m unittest discover -s /absolute/repository/tests -t /absolute/repositor
 
 ## Upgrade and rollback
 
+Version 1.6.2 preserves package paths, result types, and CI check names. The HTTP
+reference now rejects HTTPX authentication flows before I/O. Use a static
+authorization header on the fixed-origin client when suitable; challenge-based
+authentication needs a separate, explicitly bounded design.
+
 Version 1.6.0 preserves all supported paths and result types, condenses the core, adds
 evaluation/maintenance tooling and caps HTTP pool acquisition by the remaining operation
 budget. Existing check names and hash-locked application/example dependencies remain

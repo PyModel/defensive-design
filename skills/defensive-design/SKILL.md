@@ -5,7 +5,7 @@ license: MIT
 compatibility: Markdown-only workflow. The optional HTTP example needs Python 3.11+ and HTTPX 0.27+.
 metadata:
   author: PyModel
-  version: "1.6.1"
+  version: "1.6.2"
 ---
 
 # Defensive Design

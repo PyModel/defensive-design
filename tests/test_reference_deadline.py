@@ -130,5 +130,24 @@ class DeadlineCompletionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(breaker.failure_count, 0)
 
 
+class ClientPreconditionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_authentication_flow_is_rejected_before_transport(self) -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            self.fail("invalid client configuration reached the transport")
+
+        breaker = harness.mod.AsyncCircuitBreaker()
+        async with httpx.AsyncClient(
+            base_url="https://example.test",
+            transport=httpx.MockTransport(handler),
+            auth=httpx.DigestAuth("example", "example"),
+            trust_env=False,
+        ) as client:
+            with self.assertRaisesRegex(ValueError, "authentication flows"):
+                await harness.mod.fetch_user_profile(
+                    client, breaker, user_id="abc", request_id="req-1", config=harness.cfg(),
+                )
+        self.assertEqual(breaker.failure_count, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

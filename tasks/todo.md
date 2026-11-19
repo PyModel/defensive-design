@@ -1,5 +1,22 @@
 # Defensive Design 1.6.1 completion ledger (unreleased)
 
+## 1.6.2 maintenance fix
+
+- Main commit `cc61216` failed the hosted latest-HTTPX compatibility job in
+  the link-sweep interrupt regression. Its process-wide sleep mock also
+  interrupted subprocess reaping. Interrupt injection now targets only the
+  sweep's polling seam; the test still uses and reaps a real child.
+- The example now rejects HTTPX authentication flows before transport and
+  explicitly disables inherited per-request auth. Challenge handling otherwise
+  owns its own requests and intermediate response reads. No public result
+  types, package paths, or protected check names changed.
+- Local verification: 111 unit tests on locked, minimum, and current HTTPX
+  using Python 3.12; 60 reference checks; all 18 existing mutants killed.
+  This revision does not claim new model evaluations or network-link results.
+  Hosted verification is tracked on the change's GitHub checks.
+
+## 1.6.1 and prior work
+
 ## Scope and integration — 2026-11-18
 
 Complete the robust, efficient software/system architecture skill and its actual
