@@ -623,6 +623,9 @@ async def fetch_user_profile(
     - It must not configure request or response event hooks. Such hooks can mutate
       the validated URL or headers, pre-decode the body, or strip response metadata
       before this function enforces its boundaries.
+    - It must not configure HTTPX authentication flows, which can send additional
+      requests and read intermediate bodies inside one attempt. If needed, provide
+      a reviewed static Authorization header scoped to the fixed origin.
     - It must not perform transport-level retries. This function owns the retry
       loop, so a client built with `AsyncHTTPTransport(retries=N)` would
       multiply attempts by up to N + 1 - the nested-retry amplification the checklist
@@ -639,6 +642,8 @@ async def fetch_user_profile(
         )
     if any(client.event_hooks.values()):
         raise ValueError("client must not configure request or response event hooks")
+    if client.auth is not None:
+        raise ValueError("client must not configure HTTPX authentication flows")
     if client.base_url != httpx.URL(config.expected_origin):
         raise ValueError("client base_url must match config.expected_origin exactly")
 
@@ -685,6 +690,7 @@ async def fetch_user_profile(
                     "GET",
                     f"/users/{user_id}",
                     headers={"Accept-Encoding": "identity"},
+                    auth=None,
                     timeout=attempt_timeout,
                 ) as resp:
                     status = resp.status_code

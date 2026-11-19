@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.2 - unreleased
+
+### Fixed
+
+- Isolated interrupt injection to the link sweep's wait, so it no longer
+  interrupts real child-process reaping or flakes in the compatibility jobs.
+- The HTTP example rejects HTTPX client authentication flows before sending
+  requests. Such flows can issue extra requests and read intermediate bodies
+  inside a single attempt. Static authorization headers remain supported.
+
 ## 1.6.0 - unreleased
 
 ### Changed

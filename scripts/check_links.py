@@ -24,6 +24,7 @@ import urllib.request
 from dataclasses import asdict, dataclass
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from time import sleep as poll_sleep
 from urllib.parse import urlsplit
 
 from scripts.validate_skill import link_targets, tracked_markdown
@@ -215,7 +216,7 @@ def check_urls(
                     results[url] = LinkResult(url, None, "unverified", "link_deadline")
                     del active[url]
             if active:
-                time.sleep(min(0.02, max(0.0, end - time.monotonic())))
+                poll_sleep(min(0.02, max(0.0, end - time.monotonic())))
     finally:
         _stop_workers([process for process, _ in active.values()], deadline=end + CLEANUP_S)
     return [results.get(url, LinkResult(url, None, "unverified", "run_deadline")) for url in urls]

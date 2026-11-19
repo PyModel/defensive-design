@@ -163,7 +163,8 @@ class SweepTests(unittest.TestCase):
         with (
             patch.object(links, "_worker_command", return_value=[sys.executable, "-c", "import time; time.sleep(60)"]),
             patch.object(links.subprocess, "Popen", side_effect=start),
-            patch.object(links.time, "sleep", side_effect=KeyboardInterrupt),
+            # Interrupt only the sweep; leave subprocess.wait() polling alone.
+            patch.object(links, "poll_sleep", side_effect=KeyboardInterrupt),
             self.assertRaises(KeyboardInterrupt),
         ):
             links.check_urls([URL], workers=1)
