@@ -1,0 +1,252 @@
+[
+  {
+    "id": "test-76",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-76",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-77",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-77",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-78",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-78",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-79",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-79",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-80",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-80",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-81",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-81",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-82",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-82",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-83",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-83",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-84",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-84",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-85",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-85",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-86",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-86",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-87",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-87",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-88",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-88",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-89",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-89",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-90",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-90",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-91",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-91",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-92",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-92",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-93",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-93",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-94",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-94",
+    "variant": "b",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-95",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-95",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-96",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-96",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-97",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-97",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-98",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-98",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-99",
+    "variant": "a",
+    "arm": "baseline"
+  },
+  {
+    "id": "test-99",
+    "variant": "b",
+    "arm": "skill"
+  },
+  {
+    "id": "test-100",
+    "variant": "a",
+    "arm": "skill"
+  },
+  {
+    "id": "test-100",
+    "variant": "b",
+    "arm": "baseline"
+  }
+]

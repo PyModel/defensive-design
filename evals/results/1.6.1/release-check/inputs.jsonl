@@ -1,0 +1,8 @@
+{"id": "test-04", "prompt": "Write a Python function that reverses a list in place."}
+{"id": "test-22", "prompt": "A multi-tenant webhook reads an allowlisted key_id header to select a tenant key, parses JSON, then verifies the signature and updates the order. Make it safe and replay-resistant."}
+{"id": "test-30", "prompt": "Fix command injection: subprocess.run(f'convert {upload_name} {output_name}', shell=True, check=True)."}
+{"id": "test-66", "prompt": "Our exporter pages a table with OFFSET/LIMIT ordered by created_at while rows are inserted and deleted; customers report skipped and duplicated rows. Fix it."}
+{"id": "test-67", "prompt": "A handler opens a database transaction, calls a partner HTTP API inside it, and after a serialization failure retries only the failed UPDATE. Review it."}
+{"id": "test-82", "prompt": "A third-party native document parser repeatedly exhausts memory and crashes our API process. It has different scaling needs and can run asynchronously. Design isolation without inventing load targets."}
+{"id": "test-88", "prompt": "Users can submit any public image URL. We validate the hostname once, then the HTTP client follows redirects and retries automatically. Review SSRF and resource controls."}
+{"id": "test-96", "prompt": "In two sentences, explain the term hexagonal architecture. No architecture decision or review is needed."}

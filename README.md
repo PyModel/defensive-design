@@ -10,7 +10,7 @@ and agents without prescribing their implementation stack.
 
 It combines the responsibilities of a **Senior Software Architect, Staff Engineer and
 Engineering Manager**: choose justified boundaries, enforce contracts, verify failure
-paths, and make delivery and operational ownership explicit. Version **1.6.0** makes that workflow smaller and measurable: a task-first core,
+paths, and make delivery and operational ownership explicit. Version **1.6.1** makes that workflow smaller and measurable: a task-first core,
 on-demand architecture/security/operations references, reproducible behavior evidence,
 implementation fixtures and bounded maintenance tooling. It preserves the portable
 skill name and existing reference paths.
@@ -154,12 +154,29 @@ actual limitations; format portability is not a cross-model performance claim.
 
 ### Context efficiency
 
-The 1.6.0 core is **11,947 bytes and 1,385 whitespace-delimited words**, down from
+The 1.6.1 core is **12,093 bytes and 1,403 whitespace-delimited words**, down from
 16,097 bytes and 2,121 words in 1.5.0. With `tiktoken==0.12.0`, its `o200k_base` count
-fell from **3,156 to 2,346 tokens** (25.7%); `cl100k_base` fell from 3,178 to 2,358.
+fell from **3,156 to 2,375 tokens** (24.7%); `cl100k_base` fell from 3,178 to 2,388.
 These are exact counts for named public encodings, not measured runtime cost or the
 host model's undisclosed token accounting. Routing preserves detailed references while
-avoiding unconditional loading. See the evaluation record for reproducible measurements.
+avoiding unconditional loading. See the [captured measurements](evals/results/1.6.1/efficiency.json).
+
+### Observed behavior
+
+The initial 1.6.0 candidate passed **97/100** authored cases versus **87/100** for a
+no-skill baseline under the same host/model conditions. Independent graders saw
+anonymous answer variants; no critical unsafe recommendation was found. The three
+skill misses were material omissions, retained in the evidence and used to refine
+image-converter restrictions, pagination tests and database timeout guidance. A first
+eight-case refinement check scored 7/8; after making collection boundaries explicit
+in the core, a fresh check of the exact final 1.6.1 package passed **8/8**, including
+all three affected cases and mixed positive/negative regressions.
+Metadata-only selection matched all 78 positive and 22 negative labels; this is not
+a measurement of native host routing. Both arms passed the payment and export
+implementation fixtures, so those fixtures do not establish a comparative advantage.
+See the [evaluation record](evals/README.md) for exact snapshots, the final targeted
+recheck, captured answers, executable evidence and limits. CI validates archived
+evidence consistency without rerunning models or claiming fresh behavior scores.
 
 From another directory, tests support an explicit repository top level:
 

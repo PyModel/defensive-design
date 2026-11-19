@@ -1,0 +1,6 @@
+{
+  "format": "captured-utf8-text-v1",
+  "original_name": "commands.json",
+  "sha256": "d20e90c2fb97c14a2961b73fb8f43e10b3221ad5d429d942d0d32d823e3f7005",
+  "text": "[\n  {\n    \"command\": \"cat executor-prompt.txt\",\n    \"cwd\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline\",\n    \"exit_status\": 0\n  },\n  {\n    \"command\": \"cat task.md\",\n    \"cwd\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline\",\n    \"exit_status\": 0\n  },\n  {\n    \"command\": \"rg --files -g '!node_modules' -g '!vendor'\",\n    \"cwd\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline/workspace\",\n    \"exit_status\": 0\n  },\n  {\n    \"command\": \"cat export.py\",\n    \"cwd\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline/workspace\",\n    \"exit_status\": 0\n  },\n  {\n    \"command\": \"python -m unittest -v test_export\",\n    \"cwd\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline/workspace\",\n    \"exit_status\": 0,\n    \"result\": \"Ran 18 tests in 0.005s; OK\"\n  }\n]\n"
+}

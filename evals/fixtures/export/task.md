@@ -21,7 +21,8 @@ The export limit is 4096 bytes. Reject oversized content with `ValueError` befor
 publishing; do not allocate/read an unbounded document. A stream may return fewer bytes
 than requested before EOF, so a short read is not proof of completion. Every acquired
 stream must close on success and all failures. A cleanup failure must not mask the
-original read/authorization/publish error; if cleanup alone fails, propagate it. Do not
+original read/authorization/publish error; retain the secondary failure with exception
+chaining or a non-sensitive diagnostic note. If cleanup alone fails, propagate it. Do not
 print or log document contents or provider error details. Use standard-library code
 and existing boundaries; no new service, retry framework or dependency is needed.
 

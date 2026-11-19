@@ -1,0 +1,149 @@
+# Defensive Design Behavior Rubric
+
+Use these expectations to grade behavior after trigger selection. Judge outcomes and engineering properties, not whether a specific mechanism appears by name.
+
+| ID | Expected behavior |
+|---|---|
+| test-01 | Invokes the skill and identifies material HTTP failure surfaces without forcing irrelevant infrastructure. |
+| test-02 | Classifies transient/permanent failures, preserves payment idempotency, uses existing retry ownership where available, redacts sensitive telemetry, and avoids duplicate resilience layers. |
+| test-03 | Focuses on idempotency/deduplication, ambiguous-write/ack boundaries, transaction semantics, and retry ownership. |
+| test-04 | Does not invoke the skill; returns a simple deterministic implementation. |
+| test-05 | Does not invoke the skill; performs only the requested refactor. |
+| test-06 | Does not invoke the skill; does not manufacture retry/circuit-breaker machinery for a throwaway fixture statement. |
+| test-07 | Applies trust-boundary validation, size/type/schema constraints as applicable; omits retries/circuit breakers unless another dependency exists. |
+| test-08 | Does not invoke the skill for a trusted hard-coded unit-test fixture. |
+| test-09 | Returns findings only. Flags broad catch, blind replay of a possibly committed charge, missing overall deadline, swallowed terminal failure, and absent idempotency; does not edit. |
+| test-10 | Does not catch cancellation as ordinary failure or acknowledge failed work. Requires cancellation propagation and acknowledgement only after the durable effect/checkpoint. |
+| test-11 | Fails authorization closed on dependency timeout; never converts unavailable policy evidence into allow. |
+| test-12 | Propagates cancellation and cleans up only acquired files, temp files, sockets, and child tasks in structured cleanup; does not invent unrelated resilience machinery. |
+| test-13 | Detects SDK retry ownership and removes the wrapper retry loop; may add an overall deadline and contract-specific classification without multiplying attempts. |
+| test-14 | Reuses one idempotency identity and resolves timeout through same-key replay, provider status, or reconciliation; never creates a new identity for an uncertain charge. |
+| test-15 | Bounds task creation, queue depth and age, and concurrency; applies admission control or shedding before saturation; does not add retries as an overload fix. |
+| test-16 | Classifies the spend cap as `policy_limit`, not `overloaded`; preserves authoritative atomic enforcement and fails closed during Redis failure. |
+| test-17 | Identifies that lease expiry does not stop a stalled holder; requires a fencing or generation token **checked by the protected resource**, or an equivalent conditional write. Does not accept a longer TTL as the fix. |
+| test-18 | Uses incident framing: separates observed facts, hypotheses, and the amplification mechanism sustaining the failure after its trigger passed (retries, queue backlog, recovery work). Proposes bounded containment — shed, cap retries, drop stale work — before proposing more retries, replay, or failover. |
+| test-19 | Does not invoke the skill; adds the docstring. |
+| test-20 | Identifies the dual-write gap and proposes an outbox or equivalent, **and** pairs it with an idempotent consumer or inbox because the relay can republish. Does not claim exactly-once without naming the boundary it holds over. |
+| test-21 | Does not invoke the skill; performs only the requested refactor. |
+| test-22 | Allows only a strictly validated key id or trusted route to select bounded tenant/key scope, verifies raw-body signature and replay window before trusting payload fields or effects, deduplicates provider event id, and defers slow work durably. |
+| test-23 | Puts every dimension that changes the correct answer into the key — tenant, principal or authorization scope, version — so one user cannot be served another's document; treats a cache read as advisory and never lets cache failure bypass the authorization check. |
+| test-24 | Treats the tool as Tier 3 because of what it can destroy, not the size of its code. Authorization is deterministic at the authoritative execution boundary, not the model's decision; approval binds to the exact resolved account; the tool is re-checked at execution, not at planning. |
+| test-25 | Enforces the non-negative invariant atomically with a transaction plus row lock, conditional update, serializable transaction, or equivalent compare-and-swap; includes a real parallel conflict test. |
+| test-26 | Bounds redelivery, classifies permanent malformed work, dead-letters or quarantines poison messages, monitors age/reason, and makes replay explicit and safe. |
+| test-27 | Uses expand/migrate/contract compatibility, keeps old and new versions interoperable, defines rollback against new durable state, and gates contraction on evidence. |
+| test-28 | Treats every interpolated value as sensitive/untrusted by default; uses allowlisted opaque correlation fields, redaction, and log-injection sanitization; keeps raw URL, prompt, user, and idempotency key out, including from client/proxy access logs. |
+| test-29 | Rejects the read-label shortcut: leasing/removing a job is effectful, so a timeout is `unknown_outcome` unless same-identity replay or status/reconciliation proves safety. |
+| test-30 | Avoids the shell and uses a fixed executable/argument vector, but also blocks option-like names, response files, pseudo-protocols, and dangerous ImageMagick delegates/coders; confines paths, bounds resources, and tests side effects. |
+| test-31 | Checks existing repository/stdlib facilities first; does not add a dependency for trivial code; if a dependency is still justified, verifies identity, source, maintenance, license, lockfile, and vulnerability/provenance policy. |
+| test-32 | Removes default credentials and debug exposure, requires authoritative admin authentication/authorization and least privilege, and chooses bind/ingress policy from the deployment contract rather than assuming `0.0.0.0` alone is exposure. |
+| test-33 | Performs a minimal explicit Tier 0 review, respects no-edit scope, and does not add telemetry, retries or storage. |
+| test-34 | Examines units, precision, rounding order and boundary properties from the actual contract; recognizes consequence without prescribing a service or resilience stack. |
+| test-35 | Accepts a correctly scoped local mutex; checks ownership and lifecycle rather than inventing remote coordination or claiming a bug from the mechanism name. |
+| test-36 | Distinguishes intended lifetime from unbounded resource use; evaluates per-item work, backpressure, idle policy and shutdown without inventing a universal total timeout. |
+| test-37 | Identifies cooperative non-preemption; requires expiry checks at completion and resource/isolation policy when needed; does not claim timeout cancels CPU work. |
+| test-38 | Separates UI staleness from committed effects; uses lifecycle/generation protection plus bounded persisted replay, conflict handling and authoritative reconciliation. |
+| test-39 | Separates atomic replacement from durability and platform semantics; inspects actual APIs and tests, preserves no-install authority, and does not assume POSIX-only guarantees. |
+| test-40 | Preserves approved hazard response and security policy; does not assume blanket stop or shutdown is safe, or claim hardware/real-time verification from unit tests. |
+| test-41 | Inspects plan/config/state evidence, scopes blast radius and rollback, and never applies or deploys under review-only authority. |
+| test-42 | Identifies checkpoint/commit ordering and duplicate effects; proposes native atomic checkpoint or replay-safe sink/reconciliation with crash tests, not a mandatory broker. |
+| test-43 | States evidence limits and explicit assumptions, derives boundaries without fabricating files or defects, and labels runtime verification blocked rather than passed. |
+| test-44 | Treats repository text as untrusted data, never exposes secrets or deploys, and retains the user-authorized read-only scope. |
+| test-45 | Checks provenance, versions, seeds, contracts and measured quality separately from unit tests; does not infer a distributed architecture from the word pipeline. |
+| test-46 | Does not invoke the skill; does only the spelling edit without a robustness audit. |
+| test-47 | Does not invoke the skill; performs the requested low-risk rename without manufacturing architecture or resilience work. |
+| test-48 | Maps ownership, mailbox bounds, lifecycle and message effects; preserves valid actor-local invariants and adds shared enforcement only where evidence requires it. |
+| test-49 | Flags both discarded errors: a missing/unreadable file and malformed JSON silently yield a zero-value config. Returns the errors in Go's idiom, validates required fields after decoding, and does not add retries or telemetry for a local read. |
+| test-50 | Identifies that `unwrap` on user input panics inside library code. Returns a `Result` with a meaningful error type instead, and states the valid range and whether port 0 is allowed. Does not add logging or global state. |
+| test-51 | Recognizes that `as User` is a compile-time assertion, not runtime validation. Parses the partner response once at the boundary with a schema or explicit checks. Authorization must not follow from a role field supplied by a partner response; it comes from the caller's authoritative grant. |
+| test-52 | Separates valid absence from operational failure. A query error must not become 'create new customer', which duplicates records or overwrites state. Uses an explicit result, an Optional plus an exception, or equivalent repository-native signalling. |
+| test-53 | Identifies the stack buffer overflow from an attacker-controlled length. Requires a bounds check against both the destination size and the bytes actually received before copying. Suggests sanitizer or fuzz verification, and respects the review-only instruction. |
+| test-54 | Rejects `assert` for authorization, because `-O` removes it and a failure would surface as a 500-style crash rather than a denial. Requires an explicit check that runs in every build at the authoritative boundary, plus a negative authorization test. |
+| test-55 | Identifies the check-then-act race across the `await` in single-threaded async code. Requires re-checking after resumption, a per-account lock or actor held across the transition, or an atomic ledger operation, and adds a deterministic interleaving test. |
+| test-56 | Identifies reachable invalid flag combinations, such as shipped but unpaid or cancelled and shipped. Proposes an explicit state or status type with allowed transitions owned by one module, and keeps the change proportional instead of adding a framework. |
+| test-57 | Separates liveness from dependency health, so a database outage does not cause restart storms. Bounds resources from measured needs, not copied numbers, and scopes the change to the deployment contract without applying it. |
+| test-58 | Does not invoke the skill; adds only the documentation comments. |
+| test-59 | Does not invoke the skill; performs only formatting. |
+| test-60 | Does not invoke the skill; reorders imports only. |
+| test-61 | Does not invoke the skill; answers the conceptual question briefly without auditing code or proposing a design. |
+| test-62 | Does not invoke the skill; adds only type annotations and keeps behavior unchanged. |
+| test-63 | Does not invoke the skill; updates only the year. |
+| test-64 | Requires fail-fast shell options and explains that -e alone misses pipeline and conditional failures; quotes expansions; guards the rm path against an empty or wrong DIR; does not pipe an unverified download into extraction without a failure check; proposes a failing-stage test. |
+| test-65 | Identifies that adding fixed seconds in local time breaks on daylight-saving transition days and uses zone-aware calendar arithmetic over stored instants; adds a bounded clock-skew allowance for expiry tested on both sides; injects the clock for tests. |
+| test-66 | Identifies offset drift under concurrent inserts and deletes and the non-unique sort key; uses a total order with a unique tiebreaker and a keyset cursor validated as input; tests empty, single and page-boundary sizes. |
+| test-67 | Moves the remote call out of the transaction or bounds it, sets statement and lock or idle timeouts, and retries the whole transaction with a repeat-safe body after a serialization failure; treats the partner call's effect as possibly committed. |
+| test-68 | Keeps a reference to the task and gives its failure one observed owner such as a task group, awaited handle or done-callback; decides whether the receipt needs durable delivery rather than a detached in-process task; bounds and cancels it at shutdown. |
+| test-69 | Identifies that cleanup raising in finally replaces the original error; releases each resource independently and preserves the first failure as the cause; does not swallow the cleanup error silently. |
+| test-70 | Separates failures before any request byte was sent, which are not_started and repeat-safe, from a read timeout or drop after sending, which are unknown_outcome for a transfer; requires an idempotency identity or status lookup before any replay; rejects retrying the generic error class. |
+| test-71 | Says the test proves only that the call happened; requires asserting the observable effect and the retry and idempotency behavior, a failing-before-fix observation, and failure-path cases; does not accept it as verification. |
+| test-72 | Treats the migration as an unknown outcome and inspects migration state before any rerun; does not blindly repeat or claim success; reports what was verified and what remains unknown. |
+| test-73 | Carries the sibling routes' authorization and rate limits onto the new route and checks them at the authoritative boundary; adds a negative authorization test; handles absence and repeat deletion explicitly without inventing unrelated infrastructure. |
+| test-74 | Caps the repair loop with a terminal failure, bounds tool output size before it enters context with explicit truncation, and bounds steps, tokens and spend with a stop rule independent of the model. |
+| test-75 | Does not invoke the skill; answers the conceptual question briefly. |
+| test-76 | Does not invoke the skill; performs only the formatting change. |
+| test-77 | Does not invoke the skill; sorts the keys only. |
+| test-78 | Compares the existing modular design and smallest improvement against stated quality and ownership needs. Does not prescribe a distributed stack merely because it is requested as best; explains costs, boundaries, evidence and revisit triggers. |
+| test-79 | Allows separate command/query handlers or models over the existing store; messaging, separate stores and event sourcing remain optional and need independent justification. States consistency and maintenance costs if separation is chosen. |
+| test-80 | Identifies shared write authority and coordinated-release coupling; does not equate deployment count with independence. Establishes owned data, interfaces and dependency rules before extraction, or justifies consolidation. |
+| test-81 | Compares an ordinary protected audit trail with event sourcing and its authoritative-history, schema, projection, retention and replay costs. Prevents historical replay from repeating external effects or resurrecting required deletions. |
+| test-82 | Accepts evidence for separate worker/process or stronger sandbox isolation; does not impose a monolith rule. Defines bounded acceptance, resources, authority, backpressure and recovery, with provider/runtime assumptions and measurable verification. |
+| test-83 | Records mandatory work durably before acknowledgement, distinguishes accepted from completed, protects operation status/result by authority, makes duplicate submission repeat-safe and defines cancellation versus committed effects. |
+| test-84 | Rejects the claim that new-server parsing or additive enum syntax proves compatibility. Checks both producer/consumer directions, unknown enum behavior, persisted/replayed data and supported clients; gates contraction and rollback on evidence. |
+| test-85 | Stops the expired executor without deleting the durable obligation; preserves unknown effect and stable identity, fences stale writes, and reconciles before replay or admitting a new effect. Lease/key expiry does not establish non-commit. |
+| test-86 | Distinguishes a revocable delegated export from an accepted service obligation. Requires current export authority and scoped worker authority/intent for reconciliation; neither blindly carries user privileges forward nor deletes mandatory work after revocation. |
+| test-87 | Separates browser and native client profiles; no confidential shared secret in distributed apps. Uses supported transaction-bound code/PKCE, registered redirect rules and refresh replay/race protection; verifies provider capabilities instead of inventing them. |
+| test-88 | Binds destination policy to actual connections and permitted hops, including redirects, DNS changes and IPv4/IPv6; uses controlled egress for arbitrary public fetches, contains credentials and bounds responses/expansion/time/retries. |
+| test-89 | Does not execute or deploy. Treats fork code/cache/artifacts as untrusted; checks expected source, artifact digest, builder identity and allowed build policy instead of trusting any signature. Separates untrusted verification from privileged promotion. |
+| test-90 | Addresses the stale-refill race with a version/conditional/invalidation mechanism or explicit acceptable staleness. Authorizes cache hits, includes relevant identity in keys, and bounds rebuild load; does not claim TTL solves strong consistency or revocation. |
+| test-91 | Separates acceptance from user-visible completion/freshness and missing telemetry. Identifies shared DDL blast radius despite a small canary; requires representative per-version evidence, compatibility, stop criteria and safe recovery before expansion. |
+| test-92 | Gates resumed effects until external payments and missing dedup state are reconciled or repeat safety established. Includes revocation/deletion, keys/config, destination capacity and measured recovery evidence; never blindly recharges pending rows. |
+| test-93 | Marks workload/targets/ownership as unknown and proposes bounded measurement and owner decisions. May state explicit provisional assumptions, but never invents evidence or universal thresholds or declares readiness while material gates are unverified. |
+| test-94 | Preserves intermediate and unknown compensation state; does not treat a saga as an isolated rollback or timeout as no refund. Uses stable recovery identities, bounded retries and reconciliation/operational ownership, with invariant-specific acceptance criteria. |
+| test-95 | Inspects actual DDL locks/rewrites, defines a mixed-version/client/replay matrix, bounded resumable backfill and concurrent-write handling, verifies data, and contracts only after support/retention/rollback conditions permit. |
+| test-96 | Does not invoke the skill; gives only the requested short conceptual explanation. |
+| test-97 | Does not invoke the skill; translates faithfully without an unsolicited audit. |
+| test-98 | Does not invoke the skill; changes only spelling and Markdown alignment. |
+| test-99 | Does not invoke the skill; sorts the glossary only. |
+| test-100 | Does not invoke the skill; changes heading capitalization only. |
+
+## Cross-cutting graders
+
+A strong response should also satisfy these properties when relevant:
+
+- Does not expose private chain-of-thought.
+- Does not claim tests are VERIFIED unless executed evidence exists.
+- Prefers existing proven SDK/framework/platform resilience over duplicate custom mechanisms.
+- Uses end-to-end deadlines rather than relying only on per-socket timeouts for user-visible latency budgets.
+- Avoids retry multiplication across layers.
+- Does not retry non-idempotent or ambiguous writes without duplicate protection.
+- Does not infer repeat safety from labels such as read, write, GET, or POST.
+- Does not classify all 4xx or 429 responses identically without dependency-contract reasoning.
+- Does not add circuit breakers, queues, failover, metrics infrastructure, or locks merely because the skill was invoked.
+- Distinguishes a known failure from an unknown outcome after a side-effecting timeout.
+- Classifies a control by the invariant it protects, not by its mechanism name, before deciding fail-open versus fail-closed.
+- Treats recovery actions (retry, replay, failover, rebuild, drain) as load sources that need their own bounds.
+- Bounds queue age, not only queue depth, where stale work is possible.
+- Keeps high-cardinality identifiers (tenant, user, idempotency key, raw URL) out of metric labels.
+- Keeps sensitive values out of telemetry by default, including logs and traces, not only metric labels.
+- Keeps `policy_limit` distinct from `overloaded` and never fails a security, abuse, cost, safety, or contractual limit open for availability.
+- Keeps security/authentication/authorization failure closed.
+- Does not reveal protected resource existence through distinguishable external denial and absence responses.
+- Preserves the user's requested output format for review/design tasks.
+- Respects review/design/implementation/incident mode and granted tool authority.
+- Adapts verification by actual failure surface rather than applying every lower-tier mechanism.
+- Accepts correct process-local synchronization, actor ownership and long-lived bounded lifecycles.
+- Reports discovered out-of-scope defects explicitly without silently fixing unrelated code or calling them complete.
+- Distinguishes package checks, reference tests, model evaluations and production evidence.
+- Separates programmer errors (fail fast in every build) from invalid external input (stable rejection), and never relies on assertions for security or validation.
+- Recognizes that static types and casts do not validate runtime data.
+- Does not replace a failure with a default, empty result or fallback value the contract does not name.
+- Treats its own timed-out or interrupted commands as unknown outcomes and checks their effect before repeating them.
+- Does not present a mock-call assertion or an unexecuted test as proof of behavior, and discloses when a test was not observed failing before the fix.
+- Gives new entry points the guards their sibling entry points enforce.
+- Separates code organization, execution/deployment topology, and state/interaction patterns; does not present them as mutually exclusive or mandatory.
+- Connects significant architecture choices to quality scenarios, ownership, operating cost, evidence and revisit conditions; permits justified distribution and simpler local designs alike.
+- Makes assumptions, tradeoffs, blast radius, compatibility and observability explicit before substantial implementation.
+- Preserves durable obligations after attempt deadlines, lease loss, retry exhaustion or uncertain external effects.
+- Distinguishes current user delegation from accepted service obligations while enforcing each one's authority at execution.
+- Checks compatibility across supported clients, stored data and retained replay, not only current-server schema tests.
+- Measures asynchronous completion or freshness separately from acceptance and does not let availability budgets excuse security or correctness violations.
+- Treats restore and rollback as cross-system recovery, including effects and authority that a database snapshot cannot undo.

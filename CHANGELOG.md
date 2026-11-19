@@ -10,6 +10,45 @@
   requests. Such flows can issue extra requests and read intermediate bodies
   inside a single attempt. Static authorization headers remain supported.
 
+## 1.6.1 - unreleased
+
+### Added
+
+- Complete 100-case paired behavior capture, separate metadata selection, independent
+  anonymous grading and executed payment/export fixture solutions. Initial failures
+  and interrupted attempts are retained; CI verifies archived evidence consistency
+  without claiming a fresh model evaluation.
+- Exact-byte snapshot archives without duplicate discoverable skill entrypoints,
+  plus strict live/archive integrity validation and focused regressions.
+- An independent final code review and a fresh targeted check of the three discovered
+  guidance omissions plus mixed positive/negative cases.
+
+### Fixed
+
+- Image-converter advice now names version-aware delegate, filter, coder/module,
+  indirect-read and resource controls, active-policy checks and side-effect tests.
+- Pagination verification explicitly covers empty, single-row, exact-page and
+  page-plus-one boundaries. Transaction guidance distinguishes statement, lock and
+  idle limits, remaining budgets and server-side resource-release verification.
+- A cancellation regression patched the shared time module with repeated interrupts,
+  intermittently interrupting subprocess reaping. It now interrupts once and permits
+  cleanup polling; production cleanup behavior is unchanged.
+- The export fixture requires a secondary cleanup failure to remain observable while
+  preserving the primary exception. This strengthens the authored task and hidden
+  grader before any export executor ran.
+
+### Compatibility and evidence
+
+PR #9 merged the earlier 1.6.0 candidate while its complete evaluation was being
+finished. This follow-up preserves its public name, paths, HTTP result types and CI
+check names. The first refinement check scored 7/8, still omitting single-row testing.
+The final core therefore makes zero/one/limit/over-limit verification explicit. A new
+fresh check of the exact 1.6.1 package passed 8/8, including all three initially missed
+cases. Every snapshot and outcome remains separate.
+No application migration is introduced. The final core remains within 12 KiB.
+The complete initial comparison scored 97/100 for the skill and 87/100 for baseline;
+initial failures remain visible alongside the separately scoped refinement check.
+
 ## 1.6.0 - unreleased
 
 ### Changed

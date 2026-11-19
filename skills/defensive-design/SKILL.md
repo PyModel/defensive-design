@@ -156,10 +156,12 @@ Stop repeatedly failing approaches and report attempts. Fix authorized in-scope 
 track others with location, trigger, impact, evidence, status and reason open. Never
 silently defer or claim unsupported closure; omit secrets/exploit-sensitive disclosures.
 
-Test applicable boundaries/properties, malformed input, denied authority, duplicates/races,
-partial/ambiguous effects, cancellation, restart, saturation and fallback/recovery. Use
-fake clocks, seeded randomness and controlled interleavings. Separate simulation from
-integration/load. Benchmarks need baseline, workload, environment and measured result.
+Use the verification matrix to name boundary/property and failure tests per changed surface:
+collections/pagination require empty, single-element/row, exact-limit and over-limit cases;
+malformed input, denied authority, duplicates/races, partial/ambiguous effects,
+cancellation, restart, saturation and fallback/recovery. Use fake clocks, seeded randomness
+and controlled interleavings. Separate simulation from integration/load. Benchmarks need
+baseline, workload, environment and measured result.
 
 After the final relevant edit rerun affected checks and inspect the diff. Record exact
 commands, revision/environment, results, coverage limits and state:

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+    "/workspace/scratch/abe4f6ddfcc2/defensive-design/evals/fixtures/export/grader/check_export.py",
+    "/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-export-baseline/workspace"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "........\n----------------------------------------------------------------------\nRan 8 tests in 0.001s\n\nOK\n",
+  "grader_sha256": "4701f52fd34a396072baeb1b3d90f0bd22673f3bae712c90b68c9815f264000f",
+  "solution_sha256": "d270ef3c4c6aece946b4862da2e2577304d67ac7f2bc8116ab34210f374c4e3c",
+  "package_sha256": null
+}

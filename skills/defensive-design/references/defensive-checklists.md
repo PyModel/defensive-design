@@ -92,10 +92,19 @@ retry. Recheck cancellation, budget and remaining time after waiting and before 
 - [ ] Does the protected resource itself reject writes carrying a fence below the current generation? A token that nothing checks is decorative — lease expiry does not inform the paused holder.
 - [ ] Are lock hold times bounded, and is remote I/O kept out of critical sections where possible?
 - [ ] Is lock acquisition ordered consistently where possible, with deadlock detection or bounded waits and a full rollback/recovery path? A timeout bounds a wait; it does not prove deadlocks cannot occur.
-- [ ] For database work, are statement and idle-in-transaction timeouts set, so a stuck transaction cannot hold locks indefinitely?
+- [ ] For database work, are statement duration, lock acquisition and idle-in-transaction time bounded with the actual engine's mechanisms?
 - [ ] Is the isolation level known rather than assumed? Defaults differ by engine, and PostgreSQL's default, Read Committed, does not prevent a lost update from read-modify-write.
 - [ ] After a serialization failure or deadlock, is the whole transaction retried from the start with a repeat-safe body, not only the failed statement?
 - [ ] Within one process, can another thread, task, callback, or `await`/yield point run between a check and the action that depends on it? Re-check after resuming or make the transition atomic.
+
+For transaction reviews, cover effect correctness and resource occupancy separately.
+Moving HTTP outside the transaction does not finish the second job: bound pool
+acquisition, statements, lock waits and time spent idle with an open transaction.
+Compose them with the remaining operation budget and verify rollback/release on
+timeout or cancellation; a client timeout alone proves no server-side cleanup.
+Choose supported controls and values for the deployed engine and workload. PostgreSQL's
+statement, lock and idle-in-transaction limits have different scopes; do not replace
+them with one unexplained "transaction timeout" or apply a global value to every job.
 
 ## Capacity, Bounds, and Backpressure
 

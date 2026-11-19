@@ -1,0 +1,376 @@
+{
+  "counts": {
+    "ok": 57,
+    "broken": 0,
+    "unverified": 4
+  },
+  "elapsed_s": 44.001,
+  "results": [
+    {
+      "url": "https://agentskills.io/specification",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://alistair.cockburn.us/hexagonal-architecture",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secure_Product_Design_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://csrc.nist.gov/projects/ssdf",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://csrc.nist.gov/projects/ssdf/publications",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://csrc.nist.gov/pubs/sp/800/218/final",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://doc.rust-lang.org/reference/expressions/operator-expr.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://doc.rust-lang.org/std/macro.debug_assert.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/architectural-decision-records/adr-process.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/saga-orchestration.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel09-bp04.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/reference/security/secure-use",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.oracle.com/javase/8/docs/technotes/guides/language/assert.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-4.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.python.org/3/library/asyncio-task.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://docs.python.org/3/reference/simple_stmts.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://en.cppreference.com/w/c/error/assert",
+      "status": null,
+      "verdict": "unverified",
+      "reason": "link_deadline"
+    },
+    {
+      "url": "https://github.com/PyModel/defensive-design/actions/workflows/verify.yml/badge.svg",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://github.com/PyModel/defensive-design/security/advisories/new",
+      "status": null,
+      "verdict": "unverified",
+      "reason": "link_deadline"
+    },
+    {
+      "url": "https://go.dev/ref/spec",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://imagemagick.org/security-policy/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/build-skills",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-implementation",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/asynchronous-request-reply",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.debug.assert",
+      "status": null,
+      "verdict": "unverified",
+      "reason": "unreachable_or_invalid"
+    },
+    {
+      "url": "https://owasp.org/projects/asvs",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://slsa.dev/spec/v1.2/verifying-artifacts",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://sre.google/sre-book/handling-overload/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://sre.google/workbook/alerting-on-slos/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://sre.google/workbook/canarying-releases/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://sre.google/workbook/implementing-slos/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.cisa.gov/securebydesign",
+      "status": 403,
+      "verdict": "unverified",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/continuous-archiving.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/runtime-config-client.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/sql-altertable.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/transaction-iso.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.python-httpx.org/advanced/timeouts/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.python-httpx.org/environment_variables/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8252.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8725.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc9457.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc9700.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.sei.cmu.edu/library/quality-attribute-workshop-collection/",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.typescriptlang.org/docs/handbook/2/everyday-types.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    },
+    {
+      "url": "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html",
+      "status": 200,
+      "verdict": "ok",
+      "reason": "http"
+    }
+  ]
+}

@@ -1,13 +1,16 @@
 """Evidence aggregation is fail-closed; these tests do not evaluate a model."""
 from __future__ import annotations
 
+import base64
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from scripts import evaluate_skill as evaluator
 
@@ -68,6 +71,18 @@ class EvaluationEvidenceTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             evaluator.prepare(self.repo, self.run_dir, self.context_path)
         self.assertEqual(marker.read_text(), "preserve me")
+
+    def test_prepare_cleanup_failure_preserves_primary_and_secondary_errors(self) -> None:
+        primary = OSError("snapshot write failed")
+        cleanup = PermissionError("cleanup failed")
+        with (
+            patch.object(evaluator, "write_json", side_effect=primary),
+            patch.object(evaluator.shutil, "rmtree", side_effect=cleanup),
+            self.assertRaises(OSError) as caught,
+        ):
+            evaluator.prepare(self.repo, self.root / "partial", self.context_path)
+        self.assertIs(caught.exception, primary)
+        self.assertTrue(caught.exception.__cause__ is cleanup or getattr(caught.exception, "__notes__", None))
 
     def test_complete_evidence_has_exact_denominators_and_hashes(self) -> None:
         result = self.report()
@@ -172,6 +187,20 @@ class EvaluationEvidenceTests(unittest.TestCase):
         (self.run_dir / "skill" / "extra.md").write_text("unexpected", encoding="utf-8")
         with self.assertRaisesRegex(evaluator.EvidenceError, "differs"):
             self.report()
+
+    def test_archived_package_preserves_evidence_without_a_second_skill_directory(self) -> None:
+        before = self.report()
+        core = (self.run_dir / "skill" / "SKILL.md").read_bytes()
+        archive: dict[str, Any] = {"format": "defensive-design-package-v1",
+                   "files": {"SKILL.md": base64.b64encode(core).decode("ascii")}}
+        (self.run_dir / "package.json").write_text(json.dumps(archive), encoding="utf-8")
+        shutil.rmtree(self.run_dir / "skill")
+        self.assertEqual(self.report(), before)
+        for change in ({"SKILL.md": "invalid*base64"}, {"../SKILL.md": archive["files"]["SKILL.md"]},
+                       {"SKILL.md": base64.b64encode(b"altered").decode("ascii")}):
+            (self.run_dir / "package.json").write_text(json.dumps({**archive, "files": change}), encoding="utf-8")
+            with self.assertRaises(evaluator.EvidenceError):
+                self.report()
 
     def test_symlink_in_source_is_rejected(self) -> None:
         (self.skill / "outside.md").symlink_to(self.context_path)

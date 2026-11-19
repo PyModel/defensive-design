@@ -1,0 +1,208 @@
+{
+  "python": "Python 3.12.14",
+  "package_sha256": "5708c9c0b799676af83e180c382c338c1a24378c1b2f3363916ae0be658c4db6",
+  "checks": [
+    {
+      "name": "package",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "scripts/validate_skill.py"
+      ],
+      "started_at_utc": "2026-11-19T02:08:23.534030+00:00",
+      "exit_code": 0,
+      "stdout": "PASS: package metadata, reachability, local links, host metadata and eval structure\n",
+      "stderr": ""
+    },
+    {
+      "name": "reference",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "scripts/verify_reference.py"
+      ],
+      "started_at_utc": "2026-11-19T02:08:23.655244+00:00",
+      "exit_code": 0,
+      "stdout": "PASS test_success_with_contract_safe_path_segment\nPASS test_email_domain_is_canonicalized_without_unicode_aliases\nPASS test_missing_email_domain_preserves_absence\nPASS test_dot_segments_are_rejected_before_io\nPASS test_encoded_separator_candidates_are_rejected_before_io\nPASS test_non_utf8_user_id_is_rejected_before_io\nPASS test_log_correlation_id_rejects_control_characters\nPASS test_5xx_opens_breaker_without_content_length_override\nPASS test_transient_failure_then_success_resets_breaker\nPASS test_permanent_5xx_is_not_retried\nPASS test_malformed_content_encoding_is_rejected_before_decoding\nPASS test_compressed_body_is_rejected_before_expansion\nPASS test_pool_timeout_is_shed_not_retried\nPASS test_protocol_errors_are_not_retried_without_a_contract\nPASS test_unexpected_201_is_not_5xx\nPASS test_oversized_200_is_bounded\nPASS test_malformed_content_length_does_not_escape\nPASS test_deep_json_is_typed_failure\nPASS test_json_depth_scan_ignores_brackets_inside_strings\nPASS test_unsafe_json_forms_are_typed_failures\nPASS test_invalid_unicode_output_is_rejected\nPASS test_operation_deadline_is_hard\nPASS test_caller_cancellation_propagates\nPASS test_half_open_reachable_response_resolves_probe\nPASS test_http_statuses_map_to_expected_results\nPASS test_408_is_retried_not_reported_as_invalid\nPASS test_neutral_outcomes_do_not_reset_failure_count\nPASS test_contract_valid_results_reset_failure_count\nPASS test_neutral_response_during_probe_closes_breaker\nPASS test_stale_probe_result_is_fenced\nPASS test_breaker_recovery_uses_injected_clock\nPASS test_redirect_following_client_is_rejected\nPASS test_client_hooks_are_rejected_before_io\nPASS test_untrusted_dependency_origin_is_rejected_before_io\nPASS test_429_surfaces_bounded_retry_after\nPASS test_retry_after_above_budget_is_not_shortened\nPASS test_retry_after_parsing\nPASS test_retry_after_above_budget_stops_automatic_retry\nPASS test_retry_after_is_honored_over_jitter\nPASS test_module_logger_uses_pseudonymous_subjects\nPASS test_attempt_timeout_bounds_each_phase_separately\nPASS test_config_rejects_pathological_values\nPASS test_terminal_status_values_are_unique\nPASS test_config_repr_redacts_sensitive_fields\nPASS test_retry_after_beyond_remaining_deadline_returns_hint\nPASS test_slow_drip_body_is_bounded_per_attempt\nPASS test_deadline_cut_attempt_counts_as_breaker_failure\nPASS test_caller_cancellation_releases_probe_without_failure\nPASS test_chunked_body_over_limit_is_bounded_while_streaming\nPASS test_transport_errors_are_retried_and_counted\nPASS test_request_carries_configured_phase_timeouts\nPASS test_pool_timeout_during_probe_keeps_cooldown\nPASS test_invalid_payload_does_not_reset_failure_count\nPASS test_breaker_opened_mid_retry_reports_cause\nPASS test_numeric_headers_are_strict\nPASS test_display_text_rejects_invisible_and_separator_characters\nPASS test_default_pool_wait_is_shed_before_the_attempt_timer\nPASS test_backoff_delay_is_capped\nPASS test_stale_failure_permit_is_fenced\nPASS test_declared_oversize_length_is_rejected_without_reading\nPASS 60 checks total\n",
+      "stderr": "Circuit breaker rejected outbound user fetch\nUser fetch exceeded operation deadline\nUser fetch retries exhausted\nUser fetch retries exhausted\nUser fetch retry wait exceeds remaining deadline\nUser fetch retries exhausted\nUser fetch exceeded operation deadline\nUser fetch retries exhausted\nUser fetch retries exhausted\nCircuit breaker rejected outbound user fetch\nUser fetch retries exhausted\n"
+    },
+    {
+      "name": "unit",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "started_at_utc": "2026-11-19T02:08:24.163124+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_attempt_budget_is_strict (test_check_links.FetchTests.test_attempt_budget_is_strict) ... ok\ntest_only_transient_network_failures_retry (test_check_links.FetchTests.test_only_transient_network_failures_retry) ... ok\ntest_permanent_http_failure_closes_body_without_retry (test_check_links.FetchTests.test_permanent_http_failure_closes_body_without_retry) ... ok\ntest_retry_after_outside_budget_or_invalid_is_not_ignored (test_check_links.FetchTests.test_retry_after_outside_budget_or_invalid_is_not_ignored) ... ok\ntest_success_closes_response (test_check_links.FetchTests.test_success_closes_response) ... ok\ntest_transient_failure_retries_with_jitter_and_closes_error (test_check_links.FetchTests.test_transient_failure_retries_with_jitter_and_closes_error) ... ok\ntest_completed_workers_keep_every_result (test_check_links.SweepTests.test_completed_workers_keep_every_result) ... ok\ntest_failed_or_malformed_worker_cannot_become_verified (test_check_links.SweepTests.test_failed_or_malformed_worker_cannot_become_verified) ... ok\ntest_hung_workers_and_unstarted_urls_are_bounded_and_reaped (test_check_links.SweepTests.test_hung_workers_and_unstarted_urls_are_bounded_and_reaped) ... ok\ntest_invalid_budgets_and_inputs_start_no_workers (test_check_links.SweepTests.test_invalid_budgets_and_inputs_start_no_workers) ... ok\ntest_json_distinguishes_unverified_from_broken_and_exit_status (test_check_links.SweepTests.test_json_distinguishes_unverified_from_broken_and_exit_status) ... ok\ntest_keyboard_interrupt_cleans_up_running_workers (test_check_links.SweepTests.test_keyboard_interrupt_cleans_up_running_workers) ... ok\ntest_link_timeout_does_not_consume_whole_sweep_budget (test_check_links.SweepTests.test_link_timeout_does_not_consume_whole_sweep_budget) ... ok\ntest_start_failure_is_unverified (test_check_links.SweepTests.test_start_failure_is_unverified) ... ok\ntest_archived_package_preserves_evidence_without_a_second_skill_directory (test_evaluate_skill.EvaluationEvidenceTests.test_archived_package_preserves_evidence_without_a_second_skill_directory) ... ok\ntest_bad_context_does_not_create_a_run (test_evaluate_skill.EvaluationEvidenceTests.test_bad_context_does_not_create_a_run) ... ok\ntest_blocked_results_remain_in_denominator_and_pairing (test_evaluate_skill.EvaluationEvidenceTests.test_blocked_results_remain_in_denominator_and_pairing) ... ok\ntest_cli_works_from_unrelated_working_directory_and_wont_overwrite (test_evaluate_skill.EvaluationEvidenceTests.test_cli_works_from_unrelated_working_directory_and_wont_overwrite) ... ok\ntest_complete_evidence_has_exact_denominators_and_hashes (test_evaluate_skill.EvaluationEvidenceTests.test_complete_evidence_has_exact_denominators_and_hashes) ... ok\ntest_critical_failure_cannot_pass (test_evaluate_skill.EvaluationEvidenceTests.test_critical_failure_cannot_pass) ... ok\ntest_duplicate_responses_and_grades_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_duplicate_responses_and_grades_are_rejected) ... ok\ntest_grade_cannot_claim_unobserved_evidence (test_evaluate_skill.EvaluationEvidenceTests.test_grade_cannot_claim_unobserved_evidence) ... ok\ntest_invalid_unicode_is_rejected_cleanly_by_library_and_cli (test_evaluate_skill.EvaluationEvidenceTests.test_invalid_unicode_is_rejected_cleanly_by_library_and_cli) ... ok\ntest_json_duplicate_keys_nonfinite_values_and_blank_records_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_json_duplicate_keys_nonfinite_values_and_blank_records_are_rejected) ... ok\ntest_missing_responses_and_grades_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_missing_responses_and_grades_are_rejected) ... ok\ntest_modified_skill_inputs_rubric_and_corpus_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_modified_skill_inputs_rubric_and_corpus_are_rejected) ... ok\ntest_no_positive_predictions_has_undefined_precision (test_evaluate_skill.EvaluationEvidenceTests.test_no_positive_predictions_has_undefined_precision) ... ok\ntest_nonblocked_grade_requires_evidence (test_evaluate_skill.EvaluationEvidenceTests.test_nonblocked_grade_requires_evidence) ... ok\ntest_oversized_input_is_rejected_before_parsing (test_evaluate_skill.EvaluationEvidenceTests.test_oversized_input_is_rejected_before_parsing) ... ok\ntest_prepare_cleanup_failure_preserves_primary_and_secondary_errors (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_cleanup_failure_preserves_primary_and_secondary_errors) ... ok\ntest_prepare_does_not_leak_labels_or_rubric_to_executor_inputs (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_does_not_leak_labels_or_rubric_to_executor_inputs) ... ok\ntest_prepare_never_overwrites_an_existing_run (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_never_overwrites_an_existing_run) ... ok\ntest_run_cannot_be_nested_in_installable_package (test_evaluate_skill.EvaluationEvidenceTests.test_run_cannot_be_nested_in_installable_package) ... ok\ntest_snapshot_cannot_silently_add_a_file (test_evaluate_skill.EvaluationEvidenceTests.test_snapshot_cannot_silently_add_a_file) ... ok\ntest_symlink_in_source_is_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_symlink_in_source_is_rejected) ... ok\ntest_trigger_false_positives_and_negatives_are_not_swapped (test_evaluate_skill.EvaluationEvidenceTests.test_trigger_false_positives_and_negatives_are_not_swapped) ... ok\ntest_trigger_incompleteness_duplicates_and_truthy_integers_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_trigger_incompleteness_duplicates_and_truthy_integers_are_rejected) ... ok\ntest_unknown_ids_arms_and_extra_fields_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_unknown_ids_arms_and_extra_fields_are_rejected) ... ok\ntest_result_is_none_or_the_exact_ascii_value (test_fuzz_boundaries.ContentLengthProperties.test_result_is_none_or_the_exact_ascii_value) ... ok\ntest_valid_ascii_digits_parse_to_their_value (test_fuzz_boundaries.ContentLengthProperties.test_valid_ascii_digits_parse_to_their_value) ... ok\ntest_matches_real_container_depth (test_fuzz_boundaries.JsonDepthProperties.test_matches_real_container_depth) ... ok\ntest_bounded_for_arbitrary_text_digits_and_dates (test_fuzz_boundaries.RetryAfterProperties.test_bounded_for_arbitrary_text_digits_and_dates) ... ok\ntest_non_ascii_or_signed_digits_are_never_delays (test_fuzz_boundaries.RetryAfterProperties.test_non_ascii_or_signed_digits_are_never_delays) ... ok\ntest_accepted_user_id_is_exactly_one_segment_on_the_fixed_origin (test_fuzz_boundaries.TextAndIdentifierProperties.test_accepted_user_id_is_exactly_one_segment_on_the_fixed_origin) ... ok\ntest_domain_canonicalization_is_idempotent (test_fuzz_boundaries.TextAndIdentifierProperties.test_domain_canonicalization_is_idempotent) ... ok\ntest_safe_text_excludes_forging_characters_and_encodes (test_fuzz_boundaries.TextAndIdentifierProperties.test_safe_text_excludes_forging_characters_and_encodes) ... ok\ntest_local_links_never_resolve_outside_root (test_fuzz_boundaries.ValidatorProperties.test_local_links_never_resolve_outside_root) ... ok\ntest_markdown_helpers_never_raise_on_arbitrary_text (test_fuzz_boundaries.ValidatorProperties.test_markdown_helpers_never_raise_on_arbitrary_text) ... ok\ntest_quoted_counts_match_reality (test_public_surface.DocumentedCountTests.test_quoted_counts_match_reality) ... ok\ntest_only_gone_links_fail (test_public_surface.LinkCheckTests.test_only_gone_links_fail) ... ok\ntest_example_result_types_are_preserved (test_public_surface.PublicSurfaceTests.test_example_result_types_are_preserved) ... ok\ntest_package_paths_are_preserved (test_public_surface.PublicSurfaceTests.test_package_paths_are_preserved) ... ok\ntest_repository_contains_only_one_discoverable_skill (test_public_surface.PublicSurfaceTests.test_repository_contains_only_one_discoverable_skill) ... ok\ntest_completion_at_deadline_is_expired (test_reference_deadline.DeadlineCompletionTests.test_completion_at_deadline_is_expired) ... User fetch exceeded operation deadline\nok\ntest_expired_budget_before_io_does_not_charge_dependency (test_reference_deadline.DeadlineCompletionTests.test_expired_budget_before_io_does_not_charge_dependency) ... User fetch exceeded operation deadline\nok\ntest_response_cleanup_crossing_deadline_is_not_success (test_reference_deadline.DeadlineCompletionTests.test_response_cleanup_crossing_deadline_is_not_success) ... User fetch exceeded operation deadline\nok\ntest_retry_pool_wait_is_bounded_by_remaining_operation_budget (test_reference_deadline.DeadlineCompletionTests.test_retry_pool_wait_is_bounded_by_remaining_operation_budget) ... ok\ntest_success_before_deadline_is_preserved (test_reference_deadline.DeadlineCompletionTests.test_success_before_deadline_is_preserved) ... ok\ntest_synchronous_parse_crossing_deadline_is_not_success (test_reference_deadline.DeadlineCompletionTests.test_synchronous_parse_crossing_deadline_is_not_success) ... User fetch exceeded operation deadline\nok\ntest_absolute_and_backslash_paths (test_validate_skill.PackageValidationTests.test_absolute_and_backslash_paths) ... ok\ntest_actual_repository (test_validate_skill.PackageValidationTests.test_actual_repository) ... ok\ntest_binary_asset_is_not_read_as_text (test_validate_skill.PackageValidationTests.test_binary_asset_is_not_read_as_text) ... ok\ntest_core_budget (test_validate_skill.PackageValidationTests.test_core_budget) ... ok\ntest_deep_yaml_is_reported_without_a_traceback (test_validate_skill.PackageValidationTests.test_deep_yaml_is_reported_without_a_traceback) ... ok\ntest_description_length (test_validate_skill.PackageValidationTests.test_description_length) ... ok\ntest_directory_name_mismatch (test_validate_skill.PackageValidationTests.test_directory_name_mismatch) ... ok\ntest_duplicate_eval_id (test_validate_skill.PackageValidationTests.test_duplicate_eval_id) ... ok\ntest_duplicate_prompt (test_validate_skill.PackageValidationTests.test_duplicate_prompt) ... ok\ntest_duplicate_rubric_case (test_validate_skill.PackageValidationTests.test_duplicate_rubric_case) ... ok\ntest_duplicate_yaml_keys (test_validate_skill.PackageValidationTests.test_duplicate_yaml_keys) ... ok\ntest_empty_body_is_reported_directly (test_validate_skill.PackageValidationTests.test_empty_body_is_reported_directly) ... ok\ntest_encoded_traversal (test_validate_skill.PackageValidationTests.test_encoded_traversal) ... ok\ntest_fence_with_info_string_does_not_close (test_validate_skill.PackageValidationTests.test_fence_with_info_string_does_not_close) ... ok\ntest_fenced_examples_are_not_links (test_validate_skill.PackageValidationTests.test_fenced_examples_are_not_links) ... ok\ntest_hidden_format_characters_are_rejected (test_validate_skill.PackageValidationTests.test_hidden_format_characters_are_rejected) ... ok\ntest_host_prompt_must_invoke_skill (test_validate_skill.PackageValidationTests.test_host_prompt_must_invoke_skill) ... ok\ntest_host_prompt_requires_exact_skill_token (test_validate_skill.PackageValidationTests.test_host_prompt_requires_exact_skill_token) ... ok\ntest_host_unknown_keys_and_policy_type (test_validate_skill.PackageValidationTests.test_host_unknown_keys_and_policy_type) ... ok\ntest_inline_code_and_setext_heading (test_validate_skill.PackageValidationTests.test_inline_code_and_setext_heading) ... ok\ntest_invalid_eval_boolean (test_validate_skill.PackageValidationTests.test_invalid_eval_boolean) ... ok\ntest_invalid_name (test_validate_skill.PackageValidationTests.test_invalid_name) ... ok\ntest_invalid_name_states_the_rule (test_validate_skill.PackageValidationTests.test_invalid_name_states_the_rule) ... ok\ntest_invalid_utf8 (test_validate_skill.PackageValidationTests.test_invalid_utf8) ... ok\ntest_metadata_must_be_strings (test_validate_skill.PackageValidationTests.test_metadata_must_be_strings) ... ok\ntest_missing_anchor (test_validate_skill.PackageValidationTests.test_missing_anchor) ... ok\ntest_missing_dependency_is_actionable (test_validate_skill.PackageValidationTests.test_missing_dependency_is_actionable) ... ok\ntest_missing_eval_corpus_does_not_leak_host_paths (test_validate_skill.PackageValidationTests.test_missing_eval_corpus_does_not_leak_host_paths) ... ok\ntest_missing_frontmatter (test_validate_skill.PackageValidationTests.test_missing_frontmatter) ... ok\ntest_missing_link (test_validate_skill.PackageValidationTests.test_missing_link) ... ok\ntest_missing_package (test_validate_skill.PackageValidationTests.test_missing_package) ... ok\ntest_missing_rubric_case (test_validate_skill.PackageValidationTests.test_missing_rubric_case) ... ok\ntest_missing_yaml_is_one_actionable_error (test_validate_skill.PackageValidationTests.test_missing_yaml_is_one_actionable_error) ... ok\ntest_multiline_csv_is_supported (test_validate_skill.PackageValidationTests.test_multiline_csv_is_supported) ... ok\ntest_negative_share_floor (test_validate_skill.PackageValidationTests.test_negative_share_floor) ... ok\ntest_orphan_package_file_is_rejected (test_validate_skill.PackageValidationTests.test_orphan_package_file_is_rejected) ... ok\ntest_oversized_file (test_validate_skill.PackageValidationTests.test_oversized_file) ... ok\ntest_packaged_license_must_match (test_validate_skill.PackageValidationTests.test_packaged_license_must_match) ... ok\ntest_reference_style_and_html_links_are_checked (test_validate_skill.PackageValidationTests.test_reference_style_and_html_links_are_checked) ... ok\ntest_repository_docs_links_are_checked (test_validate_skill.PackageValidationTests.test_repository_docs_links_are_checked) ... ok\ntest_requires_negative_coverage (test_validate_skill.PackageValidationTests.test_requires_negative_coverage) ... ok\ntest_reserved_name_and_xml_description (test_validate_skill.PackageValidationTests.test_reserved_name_and_xml_description) ... ok\ntest_rubric_polarity (test_validate_skill.PackageValidationTests.test_rubric_polarity) ... ok\ntest_symlink_escape (test_validate_skill.PackageValidationTests.test_symlink_escape) ... ok\ntest_unclosed_fence_is_reported (test_validate_skill.PackageValidationTests.test_unclosed_fence_is_reported) ... ok\ntest_unknown_frontmatter_field_is_named (test_validate_skill.PackageValidationTests.test_unknown_frontmatter_field_is_named) ... ok\ntest_unknown_metadata_field (test_validate_skill.PackageValidationTests.test_unknown_metadata_field) ... ok\ntest_unparseable_frontmatter_is_one_error (test_validate_skill.PackageValidationTests.test_unparseable_frontmatter_is_one_error) ... ok\ntest_unreferenced_resource (test_validate_skill.PackageValidationTests.test_unreferenced_resource) ... ok\ntest_unsafe_yaml_tag_is_rejected (test_validate_skill.PackageValidationTests.test_unsafe_yaml_tag_is_rejected) ... ok\ntest_untracked_markdown_is_ignored_in_a_git_checkout (test_validate_skill.PackageValidationTests.test_untracked_markdown_is_ignored_in_a_git_checkout) ... ok\ntest_valid_anchor (test_validate_skill.PackageValidationTests.test_valid_anchor) ... ok\ntest_valid_package (test_validate_skill.PackageValidationTests.test_valid_package) ... ok\ntest_version_requires_a_changelog_section (test_validate_skill.PackageValidationTests.test_version_requires_a_changelog_section) ... ok\n\n----------------------------------------------------------------------\nRan 113 tests in 2.261s\n\nOK\n"
+    },
+    {
+      "name": "mutation",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "scripts/mutation_check.py"
+      ],
+      "started_at_utc": "2026-11-19T02:08:26.588107+00:00",
+      "exit_code": 0,
+      "stdout": "KILLED   streaming size cap\nKILLED   network error retry\nKILLED   timeout counted by breaker\nKILLED   phase timeouts sent\nKILLED   pool wait respects remaining operation budget\nKILLED   unresolved probe released\nKILLED   unsafe text rejected\nKILLED   per-attempt total bound\nKILLED   deadline-cut attempt counted\nKILLED   remaining-budget check\nKILLED   pool saturation keeps cooldown\nKILLED   garbage is breaker-neutral\nKILLED   JSON depth bound\nKILLED   backoff cap\nKILLED   stale failure permit fenced\nKILLED   declared length fast path\nKILLED   pool wait ends before the attempt timer\nKILLED   late-completion recheck\nPASS: all 18 mutants killed\n",
+      "stderr": ""
+    },
+    {
+      "name": "ruff",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "ruff",
+        "check",
+        "scripts",
+        "skills",
+        "tests"
+      ],
+      "started_at_utc": "2026-11-19T02:08:41.112070+00:00",
+      "exit_code": 0,
+      "stdout": "All checks passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "mypy",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "mypy",
+        "scripts",
+        "tests"
+      ],
+      "started_at_utc": "2026-11-19T02:08:41.150105+00:00",
+      "exit_code": 0,
+      "stdout": "Success: no issues found in 12 source files\n",
+      "stderr": ""
+    },
+    {
+      "name": "mypy-strict",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "mypy",
+        "--strict",
+        "skills/defensive-design/references"
+      ],
+      "started_at_utc": "2026-11-19T02:08:41.347724+00:00",
+      "exit_code": 0,
+      "stdout": "Success: no issues found in 1 source file\n",
+      "stderr": ""
+    },
+    {
+      "name": "compile",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "scripts",
+        "skills",
+        "tests"
+      ],
+      "started_at_utc": "2026-11-19T02:08:43.302882+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "dependencies",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "started_at_utc": "2026-11-19T02:08:43.331253+00:00",
+      "exit_code": 0,
+      "stdout": "No broken requirements found.\n",
+      "stderr": ""
+    },
+    {
+      "name": "whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_at_utc": "2026-11-19T02:08:43.552142+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "additional_checks_after_test_cleanup_fix": [
+    {
+      "name": "unit",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_attempt_budget_is_strict (test_check_links.FetchTests.test_attempt_budget_is_strict) ... ok\ntest_only_transient_network_failures_retry (test_check_links.FetchTests.test_only_transient_network_failures_retry) ... ok\ntest_permanent_http_failure_closes_body_without_retry (test_check_links.FetchTests.test_permanent_http_failure_closes_body_without_retry) ... ok\ntest_retry_after_outside_budget_or_invalid_is_not_ignored (test_check_links.FetchTests.test_retry_after_outside_budget_or_invalid_is_not_ignored) ... ok\ntest_success_closes_response (test_check_links.FetchTests.test_success_closes_response) ... ok\ntest_transient_failure_retries_with_jitter_and_closes_error (test_check_links.FetchTests.test_transient_failure_retries_with_jitter_and_closes_error) ... ok\ntest_completed_workers_keep_every_result (test_check_links.SweepTests.test_completed_workers_keep_every_result) ... ok\ntest_failed_or_malformed_worker_cannot_become_verified (test_check_links.SweepTests.test_failed_or_malformed_worker_cannot_become_verified) ... ok\ntest_hung_workers_and_unstarted_urls_are_bounded_and_reaped (test_check_links.SweepTests.test_hung_workers_and_unstarted_urls_are_bounded_and_reaped) ... ok\ntest_invalid_budgets_and_inputs_start_no_workers (test_check_links.SweepTests.test_invalid_budgets_and_inputs_start_no_workers) ... ok\ntest_json_distinguishes_unverified_from_broken_and_exit_status (test_check_links.SweepTests.test_json_distinguishes_unverified_from_broken_and_exit_status) ... ok\ntest_keyboard_interrupt_cleans_up_running_workers (test_check_links.SweepTests.test_keyboard_interrupt_cleans_up_running_workers) ... ok\ntest_link_timeout_does_not_consume_whole_sweep_budget (test_check_links.SweepTests.test_link_timeout_does_not_consume_whole_sweep_budget) ... ok\ntest_start_failure_is_unverified (test_check_links.SweepTests.test_start_failure_is_unverified) ... ok\ntest_archived_package_preserves_evidence_without_a_second_skill_directory (test_evaluate_skill.EvaluationEvidenceTests.test_archived_package_preserves_evidence_without_a_second_skill_directory) ... ok\ntest_bad_context_does_not_create_a_run (test_evaluate_skill.EvaluationEvidenceTests.test_bad_context_does_not_create_a_run) ... ok\ntest_blocked_results_remain_in_denominator_and_pairing (test_evaluate_skill.EvaluationEvidenceTests.test_blocked_results_remain_in_denominator_and_pairing) ... ok\ntest_cli_works_from_unrelated_working_directory_and_wont_overwrite (test_evaluate_skill.EvaluationEvidenceTests.test_cli_works_from_unrelated_working_directory_and_wont_overwrite) ... ok\ntest_complete_evidence_has_exact_denominators_and_hashes (test_evaluate_skill.EvaluationEvidenceTests.test_complete_evidence_has_exact_denominators_and_hashes) ... ok\ntest_critical_failure_cannot_pass (test_evaluate_skill.EvaluationEvidenceTests.test_critical_failure_cannot_pass) ... ok\ntest_duplicate_responses_and_grades_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_duplicate_responses_and_grades_are_rejected) ... ok\ntest_grade_cannot_claim_unobserved_evidence (test_evaluate_skill.EvaluationEvidenceTests.test_grade_cannot_claim_unobserved_evidence) ... ok\ntest_invalid_unicode_is_rejected_cleanly_by_library_and_cli (test_evaluate_skill.EvaluationEvidenceTests.test_invalid_unicode_is_rejected_cleanly_by_library_and_cli) ... ok\ntest_json_duplicate_keys_nonfinite_values_and_blank_records_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_json_duplicate_keys_nonfinite_values_and_blank_records_are_rejected) ... ok\ntest_missing_responses_and_grades_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_missing_responses_and_grades_are_rejected) ... ok\ntest_modified_skill_inputs_rubric_and_corpus_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_modified_skill_inputs_rubric_and_corpus_are_rejected) ... ok\ntest_no_positive_predictions_has_undefined_precision (test_evaluate_skill.EvaluationEvidenceTests.test_no_positive_predictions_has_undefined_precision) ... ok\ntest_nonblocked_grade_requires_evidence (test_evaluate_skill.EvaluationEvidenceTests.test_nonblocked_grade_requires_evidence) ... ok\ntest_oversized_input_is_rejected_before_parsing (test_evaluate_skill.EvaluationEvidenceTests.test_oversized_input_is_rejected_before_parsing) ... ok\ntest_prepare_cleanup_failure_preserves_primary_and_secondary_errors (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_cleanup_failure_preserves_primary_and_secondary_errors) ... ok\ntest_prepare_does_not_leak_labels_or_rubric_to_executor_inputs (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_does_not_leak_labels_or_rubric_to_executor_inputs) ... ok\ntest_prepare_never_overwrites_an_existing_run (test_evaluate_skill.EvaluationEvidenceTests.test_prepare_never_overwrites_an_existing_run) ... ok\ntest_run_cannot_be_nested_in_installable_package (test_evaluate_skill.EvaluationEvidenceTests.test_run_cannot_be_nested_in_installable_package) ... ok\ntest_snapshot_cannot_silently_add_a_file (test_evaluate_skill.EvaluationEvidenceTests.test_snapshot_cannot_silently_add_a_file) ... ok\ntest_symlink_in_source_is_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_symlink_in_source_is_rejected) ... ok\ntest_trigger_false_positives_and_negatives_are_not_swapped (test_evaluate_skill.EvaluationEvidenceTests.test_trigger_false_positives_and_negatives_are_not_swapped) ... ok\ntest_trigger_incompleteness_duplicates_and_truthy_integers_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_trigger_incompleteness_duplicates_and_truthy_integers_are_rejected) ... ok\ntest_unknown_ids_arms_and_extra_fields_are_rejected (test_evaluate_skill.EvaluationEvidenceTests.test_unknown_ids_arms_and_extra_fields_are_rejected) ... ok\ntest_result_is_none_or_the_exact_ascii_value (test_fuzz_boundaries.ContentLengthProperties.test_result_is_none_or_the_exact_ascii_value) ... ok\ntest_valid_ascii_digits_parse_to_their_value (test_fuzz_boundaries.ContentLengthProperties.test_valid_ascii_digits_parse_to_their_value) ... ok\ntest_matches_real_container_depth (test_fuzz_boundaries.JsonDepthProperties.test_matches_real_container_depth) ... ok\ntest_bounded_for_arbitrary_text_digits_and_dates (test_fuzz_boundaries.RetryAfterProperties.test_bounded_for_arbitrary_text_digits_and_dates) ... ok\ntest_non_ascii_or_signed_digits_are_never_delays (test_fuzz_boundaries.RetryAfterProperties.test_non_ascii_or_signed_digits_are_never_delays) ... ok\ntest_accepted_user_id_is_exactly_one_segment_on_the_fixed_origin (test_fuzz_boundaries.TextAndIdentifierProperties.test_accepted_user_id_is_exactly_one_segment_on_the_fixed_origin) ... ok\ntest_domain_canonicalization_is_idempotent (test_fuzz_boundaries.TextAndIdentifierProperties.test_domain_canonicalization_is_idempotent) ... ok\ntest_safe_text_excludes_forging_characters_and_encodes (test_fuzz_boundaries.TextAndIdentifierProperties.test_safe_text_excludes_forging_characters_and_encodes) ... ok\ntest_local_links_never_resolve_outside_root (test_fuzz_boundaries.ValidatorProperties.test_local_links_never_resolve_outside_root) ... ok\ntest_markdown_helpers_never_raise_on_arbitrary_text (test_fuzz_boundaries.ValidatorProperties.test_markdown_helpers_never_raise_on_arbitrary_text) ... ok\ntest_quoted_counts_match_reality (test_public_surface.DocumentedCountTests.test_quoted_counts_match_reality) ... ok\ntest_only_gone_links_fail (test_public_surface.LinkCheckTests.test_only_gone_links_fail) ... ok\ntest_example_result_types_are_preserved (test_public_surface.PublicSurfaceTests.test_example_result_types_are_preserved) ... ok\ntest_package_paths_are_preserved (test_public_surface.PublicSurfaceTests.test_package_paths_are_preserved) ... ok\ntest_repository_contains_only_one_discoverable_skill (test_public_surface.PublicSurfaceTests.test_repository_contains_only_one_discoverable_skill) ... ok\ntest_completion_at_deadline_is_expired (test_reference_deadline.DeadlineCompletionTests.test_completion_at_deadline_is_expired) ... User fetch exceeded operation deadline\nok\ntest_expired_budget_before_io_does_not_charge_dependency (test_reference_deadline.DeadlineCompletionTests.test_expired_budget_before_io_does_not_charge_dependency) ... User fetch exceeded operation deadline\nok\ntest_response_cleanup_crossing_deadline_is_not_success (test_reference_deadline.DeadlineCompletionTests.test_response_cleanup_crossing_deadline_is_not_success) ... User fetch exceeded operation deadline\nok\ntest_retry_pool_wait_is_bounded_by_remaining_operation_budget (test_reference_deadline.DeadlineCompletionTests.test_retry_pool_wait_is_bounded_by_remaining_operation_budget) ... ok\ntest_success_before_deadline_is_preserved (test_reference_deadline.DeadlineCompletionTests.test_success_before_deadline_is_preserved) ... ok\ntest_synchronous_parse_crossing_deadline_is_not_success (test_reference_deadline.DeadlineCompletionTests.test_synchronous_parse_crossing_deadline_is_not_success) ... User fetch exceeded operation deadline\nok\ntest_absolute_and_backslash_paths (test_validate_skill.PackageValidationTests.test_absolute_and_backslash_paths) ... ok\ntest_actual_repository (test_validate_skill.PackageValidationTests.test_actual_repository) ... ok\ntest_binary_asset_is_not_read_as_text (test_validate_skill.PackageValidationTests.test_binary_asset_is_not_read_as_text) ... ok\ntest_core_budget (test_validate_skill.PackageValidationTests.test_core_budget) ... ok\ntest_deep_yaml_is_reported_without_a_traceback (test_validate_skill.PackageValidationTests.test_deep_yaml_is_reported_without_a_traceback) ... ok\ntest_description_length (test_validate_skill.PackageValidationTests.test_description_length) ... ok\ntest_directory_name_mismatch (test_validate_skill.PackageValidationTests.test_directory_name_mismatch) ... ok\ntest_duplicate_eval_id (test_validate_skill.PackageValidationTests.test_duplicate_eval_id) ... ok\ntest_duplicate_prompt (test_validate_skill.PackageValidationTests.test_duplicate_prompt) ... ok\ntest_duplicate_rubric_case (test_validate_skill.PackageValidationTests.test_duplicate_rubric_case) ... ok\ntest_duplicate_yaml_keys (test_validate_skill.PackageValidationTests.test_duplicate_yaml_keys) ... ok\ntest_empty_body_is_reported_directly (test_validate_skill.PackageValidationTests.test_empty_body_is_reported_directly) ... ok\ntest_encoded_traversal (test_validate_skill.PackageValidationTests.test_encoded_traversal) ... ok\ntest_fence_with_info_string_does_not_close (test_validate_skill.PackageValidationTests.test_fence_with_info_string_does_not_close) ... ok\ntest_fenced_examples_are_not_links (test_validate_skill.PackageValidationTests.test_fenced_examples_are_not_links) ... ok\ntest_hidden_format_characters_are_rejected (test_validate_skill.PackageValidationTests.test_hidden_format_characters_are_rejected) ... ok\ntest_host_prompt_must_invoke_skill (test_validate_skill.PackageValidationTests.test_host_prompt_must_invoke_skill) ... ok\ntest_host_prompt_requires_exact_skill_token (test_validate_skill.PackageValidationTests.test_host_prompt_requires_exact_skill_token) ... ok\ntest_host_unknown_keys_and_policy_type (test_validate_skill.PackageValidationTests.test_host_unknown_keys_and_policy_type) ... ok\ntest_inline_code_and_setext_heading (test_validate_skill.PackageValidationTests.test_inline_code_and_setext_heading) ... ok\ntest_invalid_eval_boolean (test_validate_skill.PackageValidationTests.test_invalid_eval_boolean) ... ok\ntest_invalid_name (test_validate_skill.PackageValidationTests.test_invalid_name) ... ok\ntest_invalid_name_states_the_rule (test_validate_skill.PackageValidationTests.test_invalid_name_states_the_rule) ... ok\ntest_invalid_utf8 (test_validate_skill.PackageValidationTests.test_invalid_utf8) ... ok\ntest_metadata_must_be_strings (test_validate_skill.PackageValidationTests.test_metadata_must_be_strings) ... ok\ntest_missing_anchor (test_validate_skill.PackageValidationTests.test_missing_anchor) ... ok\ntest_missing_dependency_is_actionable (test_validate_skill.PackageValidationTests.test_missing_dependency_is_actionable) ... ok\ntest_missing_eval_corpus_does_not_leak_host_paths (test_validate_skill.PackageValidationTests.test_missing_eval_corpus_does_not_leak_host_paths) ... ok\ntest_missing_frontmatter (test_validate_skill.PackageValidationTests.test_missing_frontmatter) ... ok\ntest_missing_link (test_validate_skill.PackageValidationTests.test_missing_link) ... ok\ntest_missing_package (test_validate_skill.PackageValidationTests.test_missing_package) ... ok\ntest_missing_rubric_case (test_validate_skill.PackageValidationTests.test_missing_rubric_case) ... ok\ntest_missing_yaml_is_one_actionable_error (test_validate_skill.PackageValidationTests.test_missing_yaml_is_one_actionable_error) ... ok\ntest_multiline_csv_is_supported (test_validate_skill.PackageValidationTests.test_multiline_csv_is_supported) ... ok\ntest_negative_share_floor (test_validate_skill.PackageValidationTests.test_negative_share_floor) ... ok\ntest_orphan_package_file_is_rejected (test_validate_skill.PackageValidationTests.test_orphan_package_file_is_rejected) ... ok\ntest_oversized_file (test_validate_skill.PackageValidationTests.test_oversized_file) ... ok\ntest_packaged_license_must_match (test_validate_skill.PackageValidationTests.test_packaged_license_must_match) ... ok\ntest_reference_style_and_html_links_are_checked (test_validate_skill.PackageValidationTests.test_reference_style_and_html_links_are_checked) ... ok\ntest_repository_docs_links_are_checked (test_validate_skill.PackageValidationTests.test_repository_docs_links_are_checked) ... ok\ntest_requires_negative_coverage (test_validate_skill.PackageValidationTests.test_requires_negative_coverage) ... ok\ntest_reserved_name_and_xml_description (test_validate_skill.PackageValidationTests.test_reserved_name_and_xml_description) ... ok\ntest_rubric_polarity (test_validate_skill.PackageValidationTests.test_rubric_polarity) ... ok\ntest_symlink_escape (test_validate_skill.PackageValidationTests.test_symlink_escape) ... ok\ntest_unclosed_fence_is_reported (test_validate_skill.PackageValidationTests.test_unclosed_fence_is_reported) ... ok\ntest_unknown_frontmatter_field_is_named (test_validate_skill.PackageValidationTests.test_unknown_frontmatter_field_is_named) ... ok\ntest_unknown_metadata_field (test_validate_skill.PackageValidationTests.test_unknown_metadata_field) ... ok\ntest_unparseable_frontmatter_is_one_error (test_validate_skill.PackageValidationTests.test_unparseable_frontmatter_is_one_error) ... ok\ntest_unreferenced_resource (test_validate_skill.PackageValidationTests.test_unreferenced_resource) ... ok\ntest_unsafe_yaml_tag_is_rejected (test_validate_skill.PackageValidationTests.test_unsafe_yaml_tag_is_rejected) ... ok\ntest_untracked_markdown_is_ignored_in_a_git_checkout (test_validate_skill.PackageValidationTests.test_untracked_markdown_is_ignored_in_a_git_checkout) ... ok\ntest_valid_anchor (test_validate_skill.PackageValidationTests.test_valid_anchor) ... ok\ntest_valid_package (test_validate_skill.PackageValidationTests.test_valid_package) ... ok\ntest_version_requires_a_changelog_section (test_validate_skill.PackageValidationTests.test_version_requires_a_changelog_section) ... ok\n\n----------------------------------------------------------------------\nRan 113 tests in 2.308s\n\nOK\n"
+    },
+    {
+      "name": "ruff",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "ruff",
+        "check",
+        "scripts",
+        "skills",
+        "tests"
+      ],
+      "exit_code": 0,
+      "stdout": "All checks passed!\n",
+      "stderr": ""
+    },
+    {
+      "name": "mypy",
+      "command": [
+        "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+        "-m",
+        "mypy",
+        "scripts",
+        "tests"
+      ],
+      "exit_code": 0,
+      "stdout": "Success: no issues found in 12 source files\n",
+      "stderr": ""
+    }
+  ],
+  "repeated_cleanup_regression": {
+    "test": "tests.test_check_links.SweepTests.test_keyboard_interrupt_cleans_up_running_workers",
+    "repetitions": 20,
+    "failures": 0,
+    "errors": 0,
+    "elapsed_s": 0.038,
+    "scope": "Repeated after replacing always-interrupting shared time.sleep patch with a one-shot interruption; no production cleanup change."
+  },
+  "release_package_sha256": "f2ac42b1bd652d43c3f4cdc75c168a4ef909749bd821ceae2a12842c7f4b5509",
+  "release_checks": {
+    "commands": [
+      "python scripts/validate_skill.py",
+      "git diff --cached --check",
+      "python -m unittest tests.test_public_surface -q"
+    ],
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "public_surface_tests": 5,
+    "scope": "Final 1.6.1 package metadata, 12 KiB cap, links/reachability, corpus structure, one installable entrypoint and patch hygiene. Maintained executable code is unchanged since the full 113-test run."
+  }
+}

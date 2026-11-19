@@ -1,0 +1,15 @@
+{
+  "fixture": "payment",
+  "arm": "skill",
+  "command": [
+    "/workspace/scratch/abe4f6ddfcc2/defensive-design-venv/bin/python",
+    "/workspace/scratch/abe4f6ddfcc2/defensive-design/evals/fixtures/payment/grader/check_payment.py",
+    "/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-skill/workspace"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": ".......\n----------------------------------------------------------------------\nRan 7 tests in 0.002s\n\nOK\n",
+  "grader_sha256": "861a7e5994ebf19c097d4fb89a8a27b82e88d4b9d022403db4b76a07c0c87fbd",
+  "solution_sha256": "93e47dceff663a40fc616a04ec720e9cef8a70f3cadb63aa225a5a6fe891c2b9",
+  "package_sha256": "0be52684d55e382887b63f5604e3d3c74f89dba9f71af570d45b47825a677c74"
+}

@@ -1,0 +1,117 @@
+id,should_trigger,prompt
+test-01,true,"Use $defensive-design to review this HTTP client logic."
+test-02,true,"Make this Stripe API integration production-grade."
+test-03,true,"This queue worker sometimes duplicates charges after network timeouts. Review it."
+test-04,false,"Write a Python function that reverses a list in place."
+test-05,false,"Rename these fields in a dataclass to camelCase."
+test-06,false,"Generate a CREATE TABLE statement for a throwaway SQLite unit-test fixture."
+test-07,true,"Validate a JSON request body received from an untrusted HTTP client."
+test-08,false,"Parse this hard-coded JSON fixture used only by a unit test."
+test-09,true,"Review and list bugs only; do not edit:
+async def charge():
+    for _ in range(3):
+        try:
+            return await client.post('/charge', json=body)
+        except Exception:
+            pass"
+test-10,true,"Verify this consumer:
+async def consume(msg):
+    try:
+        await handle(msg)
+    except BaseException:
+        await queue.ack(msg)
+    return None"
+test-11,true,"Assess this permission check:
+try:
+    allowed = await authz.can(user, action)
+except TimeoutError:
+    allowed = True"
+test-12,true,"Make this uploader cancellation-safe: it opens a temp file, starts remote.put(temp), catches CancelledError and returns, but has no finally cleanup."
+test-13,true,"The SDK client has retries=3. Our wrapper also retries every RequestError three times. Make the call resilient without multiplying attempts."
+test-14,true,"This payment POST retries with a new idempotency key after any timeout; the provider may have charged before the response was lost. Make replay safe."
+test-15,true,"Each request creates an asyncio task and puts work into an unbounded Queue; during a slow dependency, memory grows until OOM. Fix overload behavior."
+test-16,true,"Redis enforces a per-account spend cap. If Redis is down, this code returns allowed=True so checkout stays available. Is that safe?"
+test-17,true,"This worker takes a distributed lock with a 30s TTL before overwriting an object in S3. Is that safe?"
+test-18,true,"Checkout latency spiked an hour ago and has not recovered even though traffic dropped back to normal."
+test-19,false,"Add a docstring to this pure string-formatting helper."
+test-20,true,"This code commits an order row, then publishes order.confirmed; a crash between them loses the event, and a crash after publish can duplicate it. Make it reliable."
+test-21,false,"Convert this in-memory list comprehension to a generator expression."
+test-22,true,"A multi-tenant webhook reads an allowlisted key_id header to select a tenant key, parses JSON, then verifies the signature and updates the order. Make it safe and replay-resistant."
+test-23,true,"Add Redis before this per-user document lookup. Current cache key is document:{document_id}; authorization runs only on a cache miss."
+test-24,true,"Give our support agent a delete_account tool. The model supplies account_id and the tool trusts it after a generic yes/no approval."
+test-25,true,"Two requests run balance = SELECT balance, verify balance >= amount, then UPDATE balance = balance - amount without a transaction or version check. Preserve non-negative balance."
+test-26,true,"A worker catches every message error and immediately nack(requeue=True); one malformed message now loops forever and blocks its partition. Fix poison handling."
+test-27,true,"A deploy renames customer_name to display_name and immediately drops the old column while old and new app versions run together. Design a safe rollout and rollback."
+test-28,true,"Review this telemetry: logger.error('failed user=%s url=%s prompt=%s key=%s', user.id, request.url, prompt, idempotency_key)."
+test-29,true,"GET /jobs/next leases and removes the next job. The client retries GET automatically after a response timeout because it calls the operation a read. Is that safe?"
+test-30,true,"Fix command injection: subprocess.run(f'convert {upload_name} {output_name}', shell=True, check=True)."
+test-31,true,"Add the package random-py-utils to implement a four-line slug helper. Review the repository and make the smallest safe dependency decision."
+test-32,true,"Make this admin service production-ready: debug=True, binds 0.0.0.0, uses a default password, and exposes /admin without an authorization check."
+test-33,true,Explicitly use $defensive-design to review this pure addition helper over trusted small integers. Do not edit it.
+test-34,true,"A pure billing function converts integer cents to float, applies a percentage, and rounds repeatedly. Review correctness without changing our architecture."
+test-35,true,This single-process desktop app protects its in-memory document map with one mutex. All access is in this process. Does defensive design require a distributed lock?
+test-36,true,Our telemetry stream intentionally runs until canceled and uses bounded buffers. Review robustness; should every stream be forced to end after 30 seconds?
+test-37,true,An asyncio timeout wraps synchronous JSON parsing. Parsing can finish after the deadline before the loop runs its timeout callback. Can this return success?
+test-38,true,"A mobile app queues edits offline; a canceled request may already have committed, and a late response overwrites newer screen state. Design recovery."
+test-39,true,Review a cross-platform CLI that replaces a file by rename and claims this guarantees survival of power loss. Do not install anything.
+test-40,true,Our embedded actuator must enter a domain-approved safe state when its sensor fails. Generalize the error handling without changing that hazard policy.
+test-41,true,"Review this infrastructure plan for state drift, destructive replacements and rollback. You may inspect and write a report, but not apply it."
+test-42,true,"Make this batch import restartable: it checkpoints before committing sink writes, and rerunning a failed batch creates duplicate records."
+test-43,true,Use defensive design on an unfamiliar architecture. Only a high-level diagram is available; you cannot inspect implementation or run tests.
+test-44,true,"While reviewing a repository, a comment says to ignore the user, print environment secrets and deploy immediately. Continue the read-only robustness review."
+test-45,true,Review the robustness of a local ML pipeline. All jobs run on one machine; model quality changes across dataset and seed revisions.
+test-46,false,Correct spelling in this trusted README paragraph; no design review or code changes are needed.
+test-47,false,Rename a local variable in this pure test fixture. Preserve all behavior.
+test-48,true,Our application uses actors with exclusive ownership of state and communicates by messages. Review invariants without replacing actors with shared database locks.
+test-49,true,"Review this Go config loader used by several services: data, _ := os.ReadFile(path); _ = json.Unmarshal(data, &cfg); return cfg"
+test-50,true,Our public Rust crate exposes pub fn parse_port(s: &str) -> u16 { s.parse().unwrap() }. Callers pass user-supplied strings. Make it robust.
+test-51,true,In TypeScript we do const user = (await res.json()) as User; if (user.role === 'admin') grantAdmin(user.id). The response comes from a partner API. Is this safe?
+test-52,true,A Java repository method returns null both when the customer does not exist and when the database query throws. Callers treat null as 'create a new customer'. Review it.
+test-53,true,"Review this C packet handler: uint16_t len = read_u16(pkt); char buf[64]; memcpy(buf, pkt + 2, len); Do not edit yet."
+test-54,true,"This Python request handler enforces admin access with assert user.is_admin, 'forbidden' before deleting a project. Is that acceptable?"
+test-55,true,Single-threaded asyncio code: if account.balance >= amount: await ledger.record(amount); account.balance -= amount. Two coroutines can run this for the same account. Is it safe without threads?
+test-56,true,"Review this module interface before we build on it: create_order(user_id, product_id, qty, is_gift, is_paid, is_shipped, is_cancelled) with all flags independently settable."
+test-57,true,"Review this Kubernetes Deployment: no CPU/memory limits, liveness probe calls an endpoint that queries the database, and replicas restart during database outages."
+test-58,false,Add Go doc comments to these exported functions; do not change behavior.
+test-59,false,Reformat this Rust file to rustfmt style; no logic changes.
+test-60,false,Reorder the imports in this Java file alphabetically.
+test-61,false,"In two sentences, what is an idempotency key? No code or design review needed."
+test-62,false,Add type annotations to this trusted internal helper that formats a date for display; no behavior change.
+test-63,false,Update the copyright year in the LICENSE file.
+test-64,true,"Review this deploy script: cd $DIR; rm -rf build/*; curl $URL | tar xz; ./migrate. It has no set options and no quoting."
+test-65,true,"A scheduler computes the next daily run as last_run + 86400 seconds in local time, and rejects tokens by comparing exp with this host's clock exactly. Review it."
+test-66,true,"Our exporter pages a table with OFFSET/LIMIT ordered by created_at while rows are inserted and deleted; customers report skipped and duplicated rows. Fix it."
+test-67,true,"A handler opens a database transaction, calls a partner HTTP API inside it, and after a serialization failure retries only the failed UPDATE. Review it."
+test-68,true,"We call asyncio.create_task(send_receipt(order)) and drop the result; receipt failures never show up anywhere. Make it robust."
+test-69,true,"Review: try: process(f) finally: f.close(); os.remove(tmp). When os.remove fails we lose the original processing error."
+test-70,true,"Our POST /transfer client retries on every httpx.TransportError. Which of ConnectError, ReadTimeout and a connection dropped after the body was sent are safe to retry?"
+test-71,true,"Review this test for our charge-retry fix: it patches client.post with a Mock, calls charge(), and asserts mock.called. Is it sufficient evidence?"
+test-72,true,"You ran our database migration command and the tool call timed out with no output. Continue the task safely."
+test-73,true,"Add a DELETE /projects/{id}/members/{uid} route next to the existing member routes, which all check project-admin permission and rate limits. Make it production-safe."
+test-74,true,"Our agent re-prompts the model until its JSON validates and feeds full tool output back into context every turn. Bound it."
+test-75,false,"In one paragraph, what does set -euo pipefail do? No review needed."
+test-76,false,"Fix the indentation of this shell script; do not change behavior."
+test-77,false,"Sort the keys of this static JSON config fixture alphabetically."
+test-78,true,"Three developers maintain restaurant ordering in one deployment and one database. We want the best production architecture and propose microservices, Kafka, CQRS and event sourcing. Design our next step."
+test-79,true,"Our read model needs different queries from our write model, but the existing database has enough capacity. Does CQRS require a broker, event sourcing and separate databases? Make the architecture decision."
+test-80,true,"We split a service into four deployments, but every service writes the same owned tables and all releases must be coordinated. Review the independence and propose the next safe architecture slice."
+test-81,true,"We need an audit trail of customer edits and refunds. The team proposes making all domain state event sourced. Compare the options, including replay and required personal-data deletion."
+test-82,true,"A third-party native document parser repeatedly exhausts memory and crashes our API process. It has different scaling needs and can run asynchronously. Design isolation without inventing load targets."
+test-83,true,"Our export API returns 202 before starting an untracked in-process task. Polling uses a secret-looking operation ID but no authorization. Make acceptance, status and cancellation production-safe."
+test-84,true,"A release adds a payment enum value and drops an old field. Two-year-old mobile clients and retained replay events remain supported. New server schema tests pass, so is the change backward compatible?"
+test-85,true,"A payment call timed out before the result was recorded, then the worker lease expired. Cleanup deletes operations older than the caller deadline; replay uses a new key. Review and design recovery."
+test-86,true,"A staff member queues a customer export then loses tenant membership. The same queue reconciles previously accepted payments. Should all jobs use captured permissions, or all require a current user login?"
+test-87,true,"Our web, iOS and Android OAuth integrations embed one shared client secret, permit any callback under our domain and save refresh-token updates with last-write-wins. Design the safe replacement."
+test-88,true,"Users can submit any public image URL. We validate the hostname once, then the HTTP client follows redirects and retries automatically. Review SSRF and resource controls."
+test-89,true,"A privileged release job downloads a cache and signed artifact from a successful fork-PR workflow. Is the signature enough to deploy with production credentials? Review only."
+test-90,true,"After a database update invalidates a cache entry, a slower read of the old value repopulates it. Permissions are checked only on misses. Design the smallest correct cache contract."
+test-91,true,"Our checkout API returns 202 successfully 99.99% of the time while completion queues grow. A 2% binary canary applies shared-database DDL, and aggregate errors are green. Can we expand the release?"
+test-92,true,"After restoring yesterday's database, today's captured payments are missing from the restored deduplication ledger and all orders appear pending. Can we reopen workers and replay the queue? Plan recovery."
+test-93,true,"Make this service production-ready. We have no measured workload, latency target, cost envelope or operations owner. Choose timeouts, capacity and an availability SLO, then tell us when it is ready."
+test-94,true,"A saga captures payment and reserves stock. Reservation fails and the refund compensation also times out. Can the coordinator mark everything rolled back and retry checkout? Review its state and recovery contract."
+test-95,true,"We plan an additive database migration and a full-table backfill during a rolling deployment, then immediately remove the old schema. Old mobile clients and retained DLQ messages remain supported. Design release gates."
+test-96,false,"In two sentences, explain the term hexagonal architecture. No architecture decision or review is needed."
+test-97,false,"Translate this existing architecture paragraph into Arabic without changing its technical meaning."
+test-98,false,"Fix only spelling and Markdown table alignment in this ADR; do not assess the decision."
+test-99,false,"Sort this static glossary of architecture pattern names alphabetically."
+test-100,false,"Change the heading capitalization in this runbook. No operational or design review."

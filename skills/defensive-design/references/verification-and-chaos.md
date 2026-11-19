@@ -7,7 +7,7 @@ Tier 3 work: what to watch at runtime and what gates a risky rollout or fault ex
 
 ## Evidence states
 
-Every verification claim carries one of the four states defined in `SKILL.md` step 5:
+Every verification claim carries one of the four states defined in the [core workflow](../SKILL.md):
 `verified`, `reasoned_not_run`, `blocked`, or `not_applicable`. Confidence is not
 evidence. A missing dependency makes a check `blocked`, never a pass. Never report a
 command's output that was not produced.
@@ -21,6 +21,7 @@ arithmetic may need strong boundary/property tests without any distributed machi
 | Failure surface | Minimum check | Tier 2/3 check | Runtime evidence |
 |---|---|---|---|
 | Local computation | Boundary values, units, rounding, overflow, empty input | Properties, numerical error budget, measured complexity | Precise error/result contract; telemetry only if useful |
+| Collections / pagination | Empty, single-row, exact-page and page-plus-one sizes; invalid cursor | Tied sort keys, concurrent inserts/deletes/updates, resume and snapshot expiry | Duplicate/skip detection, rejected cursors, bounded page count |
 | Type / module contract | Each reachable state and transition, rejected input classes, cleanup on every exit path | Exhaustiveness and type checks, sanitizers, deterministic interleavings across threads or awaits | Precise error/result contract; programmer errors fail loudly |
 | UI / offline state | Stale completion, lifecycle cancellation, explicit accessible status | Interrupted sync, conflict/replay, persisted queue bounds | Pending age, sync/recovery state without sensitive content |
 | Filesystem / device | Interrupted writes and owned-resource cleanup | Crash/power-loss or hardware tests against the platform contract | Recovery state and approved safety signals |
@@ -29,7 +30,7 @@ arithmetic may need strong boundary/property tests without any distributed machi
 | Remote timeout | Forced slow dependency | Deadline propagation across the whole chain | Deadline-exceeded rate, dependency latency percentiles |
 | Retry | Retryable and permanent failures | Retry storm against a degraded dependency | `retry_attempts / initial_attempts`, budget exhaustion |
 | Idempotency | Repeat the same key | Timeout after a simulated commit, then replay the key | Dedup hits, conflicting key reuse, unresolved operations |
-| DB concurrency | Parallel conflicting update | Serialization failure and deadlock paths | Conflict rate, serialization retries, pool wait |
+| DB concurrency | Parallel conflicting update; statement, lock-wait and idle-in-transaction limits | Serialization/deadlock retry of the full unit; cancellation and resource release | Conflict rate, serialization retries, pool/lock wait, idle transactions |
 | Outbox | Rollback and commit both exercised | Crash between broker publish and mark-published | Oldest unpublished age, publish lag, duplicate publishes |
 | Consumer / inbox | Same message delivered twice | Crash after DB commit, before broker ack | Redelivery rate, dedup rate, oldest message age |
 | Poison handling | Permanently malformed message | Replay and quarantine procedure | Dead-letter depth, age, reason breakdown |
