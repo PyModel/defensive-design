@@ -111,7 +111,8 @@ class TextAndIdentifierProperties(unittest.TestCase):
 
     def test_accepted_user_id_is_exactly_one_segment_on_the_fixed_origin(self) -> None:
         rng = random.Random(SEED)
-        with httpx.Client(base_url=ORIGIN) as client:
+        # This property only builds URLs; host proxy/CA settings are not its inputs.
+        with httpx.Client(base_url=ORIGIN, trust_env=False) as client:
             # Dot segments are too rare to rely on random generation.
             seeds = [".", "..", "...", ".a", "~", "%2e%2e"]
             for user_id in seeds + [strings(rng, 12) for _ in range(ROUNDS)]:
