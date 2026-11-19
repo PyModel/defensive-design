@@ -1,3 +1,105 @@
+# Defensive Design 1.6.1 completion ledger (unreleased)
+
+## Scope and integration — 2026-11-18
+
+Complete the robust, efficient software/system architecture skill and its actual
+verification under the user's existing authorization. The earlier 1.6.0 work was
+merged through PR #9 while the full experiment was finishing. This follow-up starts
+from `main@cc61216a2ddf2f5e6c4afd1abf77c65e2233e70b` on
+`improve/defensive-design-verified-1.6.1`. No unrelated work was overwritten.
+Historical records below retain their original status; they are not current backlog.
+
+## Completed implementation
+
+- [x] Preserved the task-first Architect / Staff Engineer / Engineering Manager workflow,
+  all nine invariant families, architecture-neutral routing and existing public paths.
+- [x] Core: 12,093 bytes / 1,403 whitespace words / 191 lines within 12 KiB; compared
+  with 1.5.0, `o200k_base` 3,156 → 2,375 and `cl100k_base` 3,178 → 2,388 using
+  `tiktoken==0.12.0`. These are encoding counts, not runtime cost/latency measurements.
+- [x] Executed all 100 authored scenarios in both skill and no-skill arms, separate
+  metadata selection, independent anonymous grading and two actual implementation
+  fixtures per arm. Preserved raw answers, grading inputs/maps and all observed failures.
+- [x] Refined the three discovered skill omissions: concrete image-converter policy,
+  pagination boundary coverage and distinct database statement/lock/idle limits.
+- [x] Preserved exact package bytes in validated JSON archives, preventing duplicate
+  discoverable skill entrypoints; added archive-integrity and cleanup regressions.
+- [x] Strengthened the export task/grader to retain secondary cleanup evidence before
+  any export executor ran. All four final fixture solutions passed hidden graders.
+- [x] Corrected the cancellation test's shared-clock mock after independent review
+  reproduced intermittent failure; preserved production behavior.
+- [x] Added CI validation of archived evidence consistency, explicitly without model
+  execution or treating historical scores as new behavior evidence.
+- [x] Completed the final fresh eight-case check against the exact shipped package:
+  8/8 passed with no blocked or critical judgments, after retaining the first 7/8 check.
+
+## Exact evaluation snapshots
+
+| Snapshot | Package SHA-256 | Purpose |
+|---|---|---|
+| Initial 1.6.0 candidate | `0be52684d55e382887b63f5604e3d3c74f89dba9f71af570d45b47825a677c74` | Complete paired corpus and implementation fixtures |
+| First refined candidate | `5708c9c0b799676af83e180c382c338c1a24378c1b2f3363916ae0be658c4db6` | Fresh eight-case check: 7 pass, 1 fail, 0 critical |
+| Final 1.6.1 package | `f2ac42b1bd652d43c3f4cdc75c168a4ef909749bd821ceae2a12842c7f4b5509` | Always-loaded collection boundary requirement; fresh check uses these exact bytes |
+
+Digests hash sorted package-relative path, NUL, raw bytes, NUL; generated Python cache
+files are excluded. [Release equivalence](../evals/results/1.6.1/release-equivalence.json)
+verifies that the final executor snapshot and shipped package have identical bytes.
+The first refinement's single-row omission remains visible; moving that requirement
+into the core is a behavioral refinement, not relabeling the earlier result.
+
+## Observed evidence
+
+| Check | Result | Scope |
+|---|---|---|
+| Complete behavior comparison | Skill 97/100; baseline 87/100 | Independent anonymous grading; 0 blocked / 0 critical in each arm; original failures retained |
+| First refinement / final package checks | 7/8, then 8/8; 0 critical | Separate fresh conversations and graders; all three originally missed cases pass on the final package |
+| Paired outcomes | 86 both pass, 11 skill-only, 1 baseline-only, 2 neither | One completed comparison; cases batched 25 per conversation |
+| Metadata selection | TP 78, TN 22, FP 0, FN 0 | Not a native host-router measurement |
+| Payment fixture | 7/7 hidden tests in each arm | In-memory, single-process simulation; no real provider durability claim |
+| Export fixture | 8/8 hidden tests in each arm | Bounded read/authority/cleanup; no atomic revoke/publish fence in supplied interface |
+| `python scripts/validate_skill.py` | verified, passed | Package, 12 KiB, reachability, metadata and corpus structure |
+| `python scripts/verify_reference.py` | verified, 60 passed | Deterministic illustrative HTTP example |
+| `python -m unittest discover -s tests -v` | verified, 113 passed | Includes archive/schema, one-entrypoint, deadline and link regressions |
+| `python scripts/mutation_check.py` | verified, 18/18 killed | Targeted HTTP defensive controls; also passed on exact Python 3.11.18 |
+| Ruff / mypy / strict example mypy | verified, passed | Maintained Python code; not semantic grading |
+| Compile / pip check / whitespace | verified, passed | Compilation, locked-environment consistency and patch hygiene |
+| Cancellation regression repetitions | verified, 20/20 passed | Rechecked after the demonstrated mock repair; independent reviewer also rechecked |
+| Archived evidence report | verified, exact recomputation | Complete IDs, exact quotations, snapshot/evidence hashes and stored aggregate |
+| Bounded external links | verified run: 61 links, 57 reachable, 0 proven broken, 4 unverified, 44.001 s | Unverified remains explicit; does not prove every URL live |
+| Independent final code review | no remaining substantive findings in reviewed delta | Offline review; one reproduced test issue fixed and rechecked |
+
+The [evaluation guide](../evals/README.md) and [complete capture](../evals/results/1.6.1/README.md)
+contain raw outputs, exact instructions, fixtures, interruption disclosure, commands
+and limits. Local primary verification used Python 3.12.14 with the hash-locked baseline.
+Hosted results are assessed at the published follow-up commit, not inferred from the
+already-green earlier PR #9 revision.
+
+## New findings and disposition
+
+| ID | Location / trigger | Evidence / impact | Disposition |
+|---|---|---|---|
+| DD-10 | Full authored corpus previously unrun | Corpus structure alone could not substantiate model behavior or baseline benefit | Closed: all 200 primary responses, 200 independent judgments, 100 selections and four fixture solutions captured |
+| DD-13 | Case 30, image converter policy | Generic policy advice did not concretely address dangerous delegates/coders | Fixed and passed in both fresh follow-ups; initial fail retained |
+| DD-14 | Archived package under repository | Extra SKILL.md could become an accidentally discoverable installable skill | JSON archive plus exact-integrity and one-entrypoint regressions |
+| DD-15 | Cases 66/67, verification and DB controls | Single-row pagination tests and statement/lock/idle limits omitted | Fixed and both pass on the final package; initial fails and the first recheck's repeated pagination omission retained |
+| DD-16 | Cancellation regression's shared time.sleep mock | Independent review reproduced second interruption of subprocess reap polling | One-shot interrupt then original sleep; 20 repeats, full suite and independent focused check passed |
+
+The earlier HTTP pool-budget repair, bounded link worker lifecycle, pinned CodeQL,
+mutation diagnostics and arbitrary-working-directory discovery are in merged 1.6.0
+and are exercised again here. The one earlier mutation baseline failure lacked its
+underlying diagnostics; DD-16 is not retroactively asserted to be its cause.
+
+## Evidence boundaries
+
+No known in-scope implementation defect remains open after independent review.
+Unavailable host/model variants and actual application integrations are not claimed
+as verified. This skill supplies reasoning and engineering procedure, not a deployable
+application or universal architecture certification. No production effects, personal
+installation, tag or application deployment are implied by repository publication.
+Four external URLs remained unverified under the bounded sweep; they were not silently
+counted as passes or removed merely to improve the count.
+
+## Historical 1.6.0 record (not current instructions, status or evidence)
+
 # Defensive Design 1.6.0 work ledger (unreleased)
 
 ## Current scope — 2026-11-18

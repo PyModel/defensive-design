@@ -8,6 +8,8 @@ Run with --help from any working directory; no optional dependency is required.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import csv
 import hashlib
 import io
@@ -174,6 +176,37 @@ def package_digest(files: dict[str, bytes]) -> str:
     return digest.hexdigest()
 
 
+def snapshot_files(run: Path) -> dict[str, bytes]:
+    """Read a live executor copy or an archive without extra discoverable SKILL.md files."""
+    if (run / "skill").exists() or (run / "skill").is_symlink():
+        return package_files(run / "skill")
+    archive = json_file(run / "package.json")
+    exact_fields(archive, {"format", "files"}, "package archive")
+    if archive["format"] != "defensive-design-package-v1" or not isinstance(archive["files"], dict):
+        fail("Invalid package archive format")
+    if not 0 < len(archive["files"]) <= MAX_PACKAGE_FILES:
+        fail("Invalid package archive file count")
+    files: dict[str, bytes] = {}
+    total = 0
+    for name, encoded in archive["files"].items():
+        if (not isinstance(name, str) or not name or "\\" in name or "\0" in name
+                or any(part in {"", ".", ".."} for part in name.split("/"))):
+            fail("Package archive paths must be normalized relative paths")
+        if not isinstance(encoded, str) or len(encoded) > (MAX_PACKAGE_BYTES * 4 // 3 + 4):
+            fail("Invalid or oversized base64 package content")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise EvidenceError("Invalid base64 package content") from exc
+        total += len(data)
+        if total > MAX_PACKAGE_BYTES:
+            fail("Package archive exceeds byte budget")
+        files[name] = data
+    if "SKILL.md" not in files:
+        fail("Package archive has no SKILL.md")
+    return files
+
+
 def validate_context(context: dict[str, Any]) -> None:
     exact_fields(context, CONTEXT_FIELDS, "context")
     for field in CONTEXT_FIELDS - {"tools"}:
@@ -277,7 +310,7 @@ def validate_manifest(run: Path) -> tuple[dict[str, Any], dict[str, bool]]:
                         (run / "corpus.csv", "corpus_sha256")):
         if hashlib.sha256(read_bytes(path)).hexdigest() != manifest[field]:
             fail(f"Snapshot digest mismatch: {path.name}")
-    files = package_files(run / "skill")
+    files = snapshot_files(run)
     if ({name: hashlib.sha256(data).hexdigest() for name, data in files.items()} != manifest["files"]
             or package_digest(files) != manifest["package_sha256"]):
         fail("Skill snapshot differs from manifest")
@@ -358,7 +391,7 @@ def report(run: Path, responses_path: Path, triggers_path: Path, grades_path: Pa
         outcome = ("both_pass" if skill_pass and baseline_pass else "skill_only_pass" if skill_pass
                    else "baseline_only_pass" if baseline_pass else "neither_pass")
         paired[outcome] += 1
-    core = read_bytes(run / "skill" / "SKILL.md")
+    core = snapshot_files(run)["SKILL.md"]
     return {
         "schema_version": 1, "context": manifest["context"],
         "package_sha256": manifest["package_sha256"], "corpus_sha256": manifest["corpus_sha256"],

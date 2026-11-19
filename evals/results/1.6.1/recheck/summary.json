@@ -1,0 +1,30 @@
+{
+  "scope": "First targeted refinement check; no new baseline or native-routing measurement",
+  "package_sha256": "5708c9c0b799676af83e180c382c338c1a24378c1b2f3363916ae0be658c4db6",
+  "case_ids": [
+    "test-04",
+    "test-22",
+    "test-30",
+    "test-66",
+    "test-67",
+    "test-82",
+    "test-88",
+    "test-96"
+  ],
+  "total": 8,
+  "counts": {
+    "pass": 7,
+    "fail": 1,
+    "blocked": 0
+  },
+  "critical_failures": 0,
+  "evidence_sha256": {
+    "inputs.jsonl": "533f44cf061c848edfe7fb0fd73cd94dcbd3bf09728f0dbb2bdf5c4af597c415",
+    "responses.jsonl": "8eed1d12cb7be43d727fb4d54d973f9a9f7f582e42f4d1bd85968960cdaa21b9",
+    "grades.jsonl": "814348b6c234ebd5e5523e342d5dddcaa789e0c2467774d3da2f2c8446508d45",
+    "grader-inputs.jsonl": "a4c102d3801c641ffc097973f491f25d8f049c861ae079c0104422b80ee941d1",
+    "executor-prompt.txt": "cf5dc3556ff50e0e68a704e82c5562727614a2b53bdedfaa5b5e3e0a83da9fb6",
+    "grader-prompt.txt": "825f5b05514e563268b57258e5abcc5cd6b0ba37c8569771f9e8ced1fc9bc532"
+  },
+  "validation": "Parent validated exact IDs/order, raw prompts against snapshot, schema and every evidence quote. This aggregates supplied independent judgments, not an automated semantic grade."
+}
