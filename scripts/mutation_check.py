@@ -36,7 +36,11 @@ MUTANTS: dict[str, tuple[str, str]] = {
         '                retry_error_code = "UPSTREAM_TIMEOUT"',
         '                probe_resolved = True\n                retry_error_code = "UPSTREAM_TIMEOUT"',
     ),
-    "phase timeouts sent": ("                    timeout=config.attempt_timeout(),\n", ""),
+    "phase timeouts sent": ("                    timeout=attempt_timeout,\n", ""),
+    "pool wait respects remaining operation budget": (
+        "                attempt_timeout.pool = min(config.effective_pool_timeout_s, remaining_s / 2)\n",
+        "",
+    ),
     "unresolved probe released": (
         "                if not probe_resolved:\n                    await breaker.release_probe(permit)",
         "                pass",
@@ -95,7 +99,7 @@ MUTANTS: dict[str, tuple[str, str]] = {
 }
 
 
-def run_suites(work: Path) -> bool:
+def run_suites(work: Path, *, diagnose: bool = False) -> bool:
     """Return True when any suite fails, meaning the mutant was detected."""
     commands = (
         [sys.executable, "scripts/verify_reference.py"],
@@ -104,9 +108,16 @@ def run_suites(work: Path) -> bool:
     for command in commands:
         try:
             result = subprocess.run(command, cwd=work, capture_output=True, timeout=TIMEOUT_S, check=False)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
+            if diagnose:
+                print(f"Baseline command timed out after {TIMEOUT_S}s: {command}", file=sys.stderr)
+                print((exc.stderr or b"")[-8000:].decode("utf-8", errors="replace"), file=sys.stderr)
             return True  # A mutant that hangs the suite is detected, not a crash of this script.
         if result.returncode != 0:
+            if diagnose:
+                print(f"Baseline command failed with exit {result.returncode}: {command}", file=sys.stderr)
+                print(result.stdout[-8000:].decode("utf-8", errors="replace"), file=sys.stderr)
+                print(result.stderr[-8000:].decode("utf-8", errors="replace"), file=sys.stderr)
             return True
     return False
 
@@ -126,7 +137,7 @@ def main() -> int:
             ignore=shutil.ignore_patterns(".git", "__pycache__", ".mypy_cache", ".ruff_cache", ".venv"),
         )
         # An unmutated copy must pass, or every mutant would look "killed".
-        if run_suites(work):
+        if run_suites(work, diagnose=True):
             print("ERROR: unmutated copy fails its checks; fix them first", file=sys.stderr)
             return 2
         for name, (old, new) in MUTANTS.items():

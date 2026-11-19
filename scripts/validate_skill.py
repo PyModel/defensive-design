@@ -31,7 +31,7 @@ except ImportError:  # Reported as an actionable validation error, not a traceba
 
 MAX_FILE_BYTES = 256 * 1024
 MAX_PACKAGE_FILES = 128
-MAX_CORE_BYTES = 16 * 1024  # Project budget, not an Agent Skills specification limit.
+MAX_CORE_BYTES = 12 * 1024  # Project budget, not an Agent Skills specification limit.
 MAX_CORE_LINES = 500
 MIN_NEGATIVE_SHARE = 0.2  # Project floor so trigger precision stays measurable.
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")

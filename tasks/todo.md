@@ -1,3 +1,61 @@
+# Defensive Design 1.6.0 work ledger (unreleased)
+
+## Current scope — 2026-11-18
+
+User requested completion of the robust, efficient software/system architecture skill,
+with no silently deferred work. This revision closes the evaluation, efficiency,
+bounded-link-checking, CodeQL, test-import and HTTP deadline gaps from earlier records.
+Repository development and authorized GitHub publication are tracked separately from
+application deployment, which is not applicable to this Markdown skill.
+
+Base: `main@7197f50057dc69073dda4903f2261cb858a9e844` (merged 1.5.0).
+Work branch: `improve/complete-defensive-design-2026-11-18`.
+Earlier records are preserved as historical evidence, not current instructions or status.
+
+## Implemented
+
+- [x] Task-first core with all nine invariant families and existing references retained:
+  11,947 bytes / 1,385 words / 189 lines, versus 16,097 / 2,121 / 236.
+- [x] Exact named-encoding token measurements outside runtime dependencies:
+  `tiktoken==0.12.0`, `o200k_base` 3,156 → 2,346; `cl100k_base` 3,178 → 2,358.
+  These are encoding-specific counts, not a host runtime cost/latency measurement.
+- [x] New 12 KiB maintenance budget to prevent core context growth.
+- [x] Model-independent snapshot/evidence harness with strict schemas, exact case
+  coverage, verbatim grading evidence and honest blocked/failed denominators.
+- [x] Separate payment recovery and object-authorization implementation fixtures;
+  buggy starters fail their hidden checks before any agent repairs them.
+- [x] Bounded concurrent external-link checking, explicit unverified outcomes,
+  process cleanup and JSON evidence; 14 new offline regressions.
+- [x] Pinned Python CodeQL security-extended workflow with minimal upload permissions.
+- [x] Expired/retried HTTP pool acquisition fix and two deadline regressions;
+  an added targeted mutant verifies the remaining-budget guard.
+- [x] Test-package discovery from arbitrary working directories with `-s` and `-t`;
+  no per-file import-path hacks or new application dependencies.
+
+## Current verification
+
+The final package snapshot SHA-256 is
+`0be52684d55e382887b63f5604e3d3c74f89dba9f71af570d45b47825a677c74`.
+This hashes sorted package-relative path, NUL, raw content, NUL, excluding generated
+`__pycache__`. Model evaluation uses this exact snapshot. The baseline receives no
+skill instructions; raw corpus inputs contain no expected selection or grading text.
+
+Execution evidence and dispositions are being completed for this revision. The final
+record distinguishes model judgments, executable fixture assertions, offline repository
+checks, live links and hosted CI. A single host/model experiment cannot establish
+universal superiority; no broader performance claim is implied.
+
+## Findings and disposition
+
+| ID | Location / trigger | Evidence and impact | Status |
+|---|---|---|---|
+| DD-08 | HTTP retry enters pool acquisition after most of operation budget is spent | Before fix, configured pool wait was 0.2 s while less than 0.1 s remained; operation expired and local saturation could be charged to upstream breaker | Fixed: remaining-budget cap, no-I/O expiry guard, executable regressions and mutant |
+| DD-09 | Serial external link checker encounters slow DNS/network | Prior 120 s invocation produced no complete report; urllib timeout did not cover whole-run/DNS behavior | Fixed: process isolation and bounded sweep, full classifications preserved |
+| DD-11 | New pool regression mixed a fake clock jump with a real sleep | First hosted latest-HTTPX canary expired under runner scheduling while other jobs passed | Fixed test to advance the controlled monotonic clock by the transport wait; removed wall-clock dependence without weakening guard/outcome assertions |
+| DD-10 | 100 authored cases were treated only as a structure-valid corpus | No complete trigger/behavior/baseline evidence or implementation fixture existed | Harness and fixtures implemented; full experiment evidence recorded below when executed |
+
+## Historical 1.5.0 record (not current instructions, status or evidence)
+
 # Defensive Design 1.5.0 work ledger (unreleased)
 
 ## Current scope — 2026-11-18

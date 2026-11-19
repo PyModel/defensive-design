@@ -70,7 +70,9 @@ class ResilienceConfig:
     # let the slow phases be bounded separately. For connect, None means "use the
     # per-attempt value". For pool, None means half of it: the pool wait must end
     # strictly before the per-attempt timer, or local saturation is reported as an
-    # upstream timeout and charged to the breaker. httpx cannot split the TLS
+    # upstream timeout and charged to the breaker. Each attempt also caps its pool
+    # wait below the remaining operation budget, which can be smaller after a retry.
+    # httpx cannot split the TLS
     # handshake from connect, so that clause of the checklist is not applicable here.
     connect_timeout_s: float | None = None
     pool_timeout_s: float | None = None
@@ -671,11 +673,19 @@ async def fetch_user_profile(
             retry_after_hint: float | None = None
 
             try:
+                remaining_s = deadline - loop.time()
+                if remaining_s <= 0:
+                    # No I/O began: deadline exhaustion is not a dependency failure.
+                    await breaker.abandon_probe(permit)
+                    probe_resolved = True
+                    return FetchResult(status=FetchStatus.CANCELLED, error_code="DEADLINE_EXCEEDED")
+                attempt_timeout = config.attempt_timeout()
+                attempt_timeout.pool = min(config.effective_pool_timeout_s, remaining_s / 2)
                 async with asyncio.timeout(config.per_attempt_timeout_s), client.stream(
                     "GET",
                     f"/users/{user_id}",
                     headers={"Accept-Encoding": "identity"},
-                    timeout=config.attempt_timeout(),
+                    timeout=attempt_timeout,
                 ) as resp:
                     status = resp.status_code
 
