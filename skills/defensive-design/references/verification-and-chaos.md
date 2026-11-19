@@ -3,7 +3,7 @@
 Companion to `SKILL.md`. Use when choosing failure-path tests, and for Tier 2 and
 Tier 3 work: what to watch at runtime and what gates a risky rollout or fault experiment.
 
-**Contents:** [Evidence states](#evidence-states) · [Verification matrix](#verification-matrix) · [Test integrity](#test-integrity) · [Failure-path test catalogue](#failure-path-test-catalogue) · [Runtime signals that reveal amplification](#runtime-signals-that-reveal-amplification) · [Fault injection and chaos gates](#fault-injection-and-chaos-gates) · [Rollout and rollback contract](#rollout-and-rollback-contract) · [Evidence limitations](#evidence-limitations)
+**Contents:** [Evidence states](#evidence-states) · [Verification matrix](#verification-matrix) · [Test integrity](#test-integrity) · [Failure-path test catalogue](#failure-path-test-catalogue) · [Service objectives and operational ownership](#service-objectives-and-operational-ownership) · [Runtime signals that reveal amplification](#runtime-signals-that-reveal-amplification) · [Fault injection and chaos gates](#fault-injection-and-chaos-gates) · [Rollout and rollback contract](#rollout-and-rollback-contract) · [Migration execution](#migration-execution) · [Restore and failover evidence](#restore-and-failover-evidence) · [Evidence limitations](#evidence-limitations)
 
 ## Evidence states
 
@@ -39,6 +39,8 @@ arithmetic may need strong boundary/property tests without any distributed machi
 | Degradation | Dependency disabled | Several dependencies failing together | Degraded-response rate and duration |
 | Auth and tenancy | Negative authorization matrix | Authz provider outage, adversarial tenant identifiers | Deny and fail-closed rate, cross-scope anomalies |
 | Dependency/build integrity | Changed component identity and lock/provenance checks | Known-vulnerable or tampered fixture where supported | Scan findings, provenance failures, update age |
+| Contract evolution | Old/new readers and writers against supported formats | Retained event replay and delayed mobile/offline clients | Compatibility rejects, unresolved operations, rollout version |
+| Schema/backfill | Representative pre-migration data and restartable batches | Concurrent traffic, interrupted migration and rollback compatibility | Lock wait, replica lag, progress, invariant violations |
 | LLM and tools | Invalid args, unauthorized tool, exceeded budget | Prompt injection via retrieved content, approval replay | Tool attempts, denials, approval failures, budget exhaustion |
 | Cancellation | Cancel mid-operation | Worker killed during a durable transition | In-flight age, abandoned operations |
 | Recovery | Restart or failover | Controlled fault plus restore drill | Time to safe steady state, reconciliation backlog |
@@ -84,13 +86,45 @@ never a pass.
 - [ ] Graceful shutdown during in-flight work: drained or checkpointed, leases released.
 - [ ] Worker lease expiry and redelivery: no duplicate effect, no lost message.
 - [ ] Poison message: dead-lettered, pipeline continues.
+- [ ] Retry exhaustion or quarantine retention reached: a durable obligation remains owned and recoverable, with controlled replay and unchanged operation identity.
 - [ ] Bounds enforced: full queue, oversized payload, excessive fan-out, deep recursion, large result set.
 - [ ] Backpressure: overload produces deliberate rejection or shedding rather than collapse.
-- [ ] Stale work past its deadline or TTL is dropped, not processed at capacity cost.
+- [ ] An expired attempt is stopped where the contract permits, while paid orders, reconciliation records and other durable obligations survive caller deadlines or lost worker leases.
 - [ ] Stale lease holder resumes after a new holder acquired the lease: its write is rejected by fence.
 - [ ] Cache failure: treated as a miss where safe, never as an authorization bypass.
 - [ ] Logs and metrics from failure paths contain no secrets and no unbounded cardinality.
 - [ ] Secret canaries, encoded payloads, and sink-specific injection probes do not reach telemetry, syntax, privilege, or unintended resources.
+- [ ] Telemetry export fails or saturates: diagnostic buffering stays bounded, and any required durable audit follows its explicit failure policy.
+
+## Service objectives and operational ownership
+
+For a service or durable workflow, name the user journey and its accountable owner.
+Define an SLI's good outcome, eligible population, measurement point and window before
+choosing a target. Count user-visible timeout, loss, incorrectness and unacceptable
+staleness according to that contract; an HTTP success or queue acknowledgement may only
+prove acceptance. Measure completion or freshness separately for asynchronous work.
+Document exclusions and missing-data behavior so apparent success cannot improve merely
+because failed work stopped emitting metrics.
+
+Agree the SLO and error-budget policy with the owner who can balance reliability and
+feature work. Derive alerts from impact and budget consumption, including sustained
+degradation; route urgent pages separately from planned work. Do not copy another
+service's target, burn-rate threshold or release-freeze rule. Correctness, authority and
+security invariants do not become optional when an availability budget remains.
+
+Before handing over a material operational change, record:
+
+| Responsibility | Minimum useful evidence |
+|---|---|
+| Response | Named team/role, alert route and escalation, bounded diagnostic steps, recovery action and access prerequisites |
+| Capacity | Representative workload, peak and burst assumptions, dependency limits, headroom and cost envelope |
+| Recovery | Stated recovery time and acceptable data loss, restore/reconciliation procedure, last exercise and remaining gaps |
+| Upkeep | Owner and review date for temporary exceptions, feature flags, supported versions and deferred risks |
+
+Use the existing operational system; do not create a new dashboard or on-call process
+for a pure helper. For capacity tests, report offered load, achieved throughput,
+latency distribution, failures and saturation together, including the load generator's
+limits; a lower achieved request rate is not proof that overload was handled.
 
 ## Runtime signals that reveal amplification
 
@@ -149,6 +183,9 @@ records, policy, or agent tool schemas, answer these before shipping:
 
 ```text
 deployment unit      What exactly is changing?
+artifact and config  Which immutable build, configuration, flags and schema revision were verified?
+owner and authority  Who may release, halt and recover it in this environment?
+blast radius         Which users, tenants, regions, shared stores and downstream systems can be affected?
 forward compatibility Can old and new versions run concurrently?
 data compatibility    Is the migration expand/contract safe?
 replay compatibility  Are in-flight messages and existing idempotency records still understood?
@@ -161,6 +198,68 @@ postcondition         What evidence proves a safe steady state was reached?
 
 A software rollback that cannot interpret durable work created by the new
 version is not a rollback.
+
+Compare a representative canary with a control using per-version signals, a meaningful
+traffic sample and an explicit observation window. A green aggregate can hide a failed
+small cohort. Account for delayed jobs, rare paths and shared-state effects: a database
+migration can affect every instance even if the new binary receives little traffic.
+State what missing telemetry does to promotion. Test the feature-disable path and give
+temporary flags an owner and retirement condition; a flag does not undo committed data.
+
+## Migration execution
+
+Use [interface contracts](interface-contracts.md) for compatibility semantics. For a
+durable change, build the actual old/new producer, consumer, client and stored-data
+matrix, including supported offline clients and retained queue or quarantine messages.
+
+1. Expand with a compatible additive change where possible. Inspect the engine/version's
+   real locks, table rewrites, constraint validation and replication costs before applying
+   it; additive syntax is not proof of an online migration.
+2. Deploy readers and writers that tolerate the coexistence period. Identify the source
+   of truth; temporary dual writes need failure handling and reconciliation, not an
+   assumption that two independent writes are atomic.
+3. Backfill in bounded, resumable, idempotent batches with a checkpoint and stop condition.
+   Protect normal traffic, measure progress/lag, and define concurrent-write behavior.
+4. Validate data and business invariants before switching reads or enforcing constraints.
+   A successful migration command is not evidence that all existing data satisfies them.
+5. Contract only after old binaries, supported clients and retained replays no longer
+   require the old representation, and the rollback policy permits removal. Otherwise,
+   keep compatibility or make a supported versioned break explicit.
+
+Rehearse interruption and recovery against representative data. If reversal is unsafe,
+prepare a tested forward repair or restore-and-reconcile procedure before release, and
+identify the step after which a simple binary rollback stops being valid.
+
+## Restore and failover evidence
+
+Where durable data matters, define recovery time objective (RTO) and recovery point
+objective (RPO) per critical data set or workflow, then test them. A successful backup
+job or replica does not establish recoverability. Restore into an authorized isolated
+environment and verify readable data, application invariants, required configuration,
+keys, identities and dependencies. Measure the path to safe service, including restore,
+replay and reconciliation, rather than only the file-copy duration.
+
+Before reopening effects, address each applicable recovery boundary explicitly; matching
+payment totals alone does not establish that the restored application is safe:
+
+| Boundary | Evidence needed before reopening |
+|---|---|
+| External effects | Inventory completed payments, messages and object writes beyond the snapshot; reconcile missing deduplication records or prove repeat safety |
+| Authority and privacy | Reapply required revocations/deletions and tombstones from authoritative surviving records; do not resurrect revoked access or data |
+| Keys and configuration | Verify usable current credentials, necessary decryption keys, application/config/schema compatibility and dependency access |
+| Ownership and capacity | Exclude stale writers and bound destination concurrency/backlog drain against actual capacity |
+| Data and recovery objectives | Validate per-operation invariants, readable/complete data and measured time/loss through safe service |
+
+Keep an unresolved boundary visible with its owner and next action. Mark a nonexistent
+surface `not_applicable` with evidence; do not silently omit it or invent a pass. Test
+backup access independently of a failed primary.
+
+For failover, verify destination capacity, routing convergence, replica lag and acceptable
+data loss. Prevent concurrent writers through the platform's actual quorum, fencing or
+conditional-write guarantee; a routing switch alone is not ownership transfer. Exercise
+failback and bounded backlog drain as well. Record the exact recovery point, measured
+RTO/RPO, failures, owner and next exercise; where no safe drill ran, label the claim
+`reasoned_not_run` or `blocked`.
 
 ## Evidence limitations
 

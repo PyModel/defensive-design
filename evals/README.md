@@ -49,3 +49,35 @@ follow-up case per discovered regression rather than merely weakening the rubric
 
 No model runs are supplied by the corpus itself. CI currently validates its structure
 and executes Python regressions; it does not run an autonomous-agent benchmark.
+
+## 1.5.0 bounded behavioral sample — 2026-11-18
+
+Environment: ChatGPT Work, GPT-6 Astra Pro subagents with fresh conversations and no
+parent history. The exact model build identifier is not exposed by the host. Agents
+received an isolated copy of the installable skill and raw hypothetical user scenarios;
+they were instructed to read only that directory. The corpus, rubric and expected
+answers were not included in their prompts or skill copy. This was instructional
+scoping, not an enforced filesystem access boundary in the shared workspace.
+No production credentials, external actions or application fixtures were provided.
+The root author graded observable responses against the corresponding rubric rows.
+
+| Case | Initial result | Evidence from the response |
+|---|---|---|
+| test-78 | Pass | Chose modular ownership with local transactions; made service/CQRS/event-sourcing adoption conditional on evidence |
+| test-82 | Pass | Accepted parser isolation and a separate worker boundary, with enforced resources, durable acceptance and bounded recovery |
+| test-84 | Pass | Rejected new-server-only compatibility evidence; required old/new clients, retained events and rollback-readability checks |
+| test-85 | Pass | Preserved the payment obligation and original identity after timeout/lease expiry; required reconciliation and stale-writer exclusion |
+| test-86 | Pass | Separated revoked export delegation from accepted payment obligations and checked scoped worker authority |
+| test-87 | Pass | Distinguished public/native and confidential clients, exact redirect policy, supported PKCE and refresh concurrency/revocation |
+| test-89 | Pass | Refused to infer trusted promotion from a signed fork artifact; checked source/build/digest policy without deploying |
+| test-91 | Pass | Distinguished acceptance from completion and recognized shared DDL blast radius and per-version release gates |
+| test-92 | Partial, then pass on recheck | Initially handled payment/dedup recovery but omitted explicit privacy/revocation, key/config and capacity gates; the restore section was clarified and a fresh response covered all applicable gates |
+
+The test-92 recheck used the same raw restoration scenario in a fresh conversation,
+without the earlier response, diagnosis or expected answer. This is nine distinct
+design/review scenarios and ten total scenario responses, not ten independent cases.
+All nine ultimately matched the selected rubric; one required a guidance refinement.
+There is no no-skill baseline, trigger measurement, negative-trigger execution,
+cross-host evaluation, implementation-mode fixture or statistical quality claim.
+The full 100-case corpus remains unrun. See [the work ledger](../tasks/todo.md) for
+the source baseline, package digest, commands and outstanding verification boundaries.

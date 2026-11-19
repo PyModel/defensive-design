@@ -4,6 +4,9 @@ Read this when the execution model is unfamiliar, spans several architectures, o
 not an always-online service. These are reasoning adapters, not mandatory components.
 For a new architecture, derive controls from its capabilities and failure surfaces;
 matching a row below is not required.
+For choosing or changing boundaries, deployment topology or state ownership, first use
+[architecture decisions](architecture-decisions.md); this reference adapts the chosen
+design to its execution model.
 
 ## Evidence profile
 

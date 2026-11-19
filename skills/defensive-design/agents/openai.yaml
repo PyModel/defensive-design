@@ -1,6 +1,6 @@
 interface:
   display_name: "Defensive Design"
-  short_description: "Evidence-driven, architecture-neutral robustness"
-  default_prompt: "Use $defensive-design to assess this change using repository evidence and proportional controls. Respect the requested review, design, implementation, or incident scope."
+  short_description: "Architecture decisions and production readiness"
+  default_prompt: "Use $defensive-design to assess this change's architecture, failure contracts, security and production readiness using evidence and proportional controls. Respect the requested scope."
 policy:
   allow_implicit_invocation: true

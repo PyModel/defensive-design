@@ -1,4 +1,113 @@
-# Defensive Design 1.4.0 work ledger (unreleased)
+# Defensive Design 1.5.0 work ledger (unreleased)
+
+## Current scope — 2026-11-18
+
+User request: inspect and refine `PyModel/defensive-design` into broadly applicable,
+production-ready architecture and engineering guidance, enforcing error/edge-case
+handling, bounded repeat-safe retries, security and shipping rigor. This is repository
+development; no personal skill installation, merge, tag, release or deployment is part
+of this change. Preserve the portable package, existing public paths and HTTP example.
+
+Base: `main@31cd5f676f3eac4f64ce76f18088198efaf815cc` (1.4.0).
+Work branch: `improve/production-architecture-2026-11-18`.
+Reviewable publication: branch and draft pull request; saved Git state is reported
+separately from package or application readiness. Earlier records below are historical,
+not current authority, status or evidence.
+
+## Completed
+
+- [x] Inspected the existing core, all references, package/CI contracts and evaluation setup.
+- [x] Added architecture decisions and interface contracts as on-demand references;
+  retained the core at 236 lines and 16,097 bytes, below the existing 16 KiB limit.
+- [x] Added explicit architect/staff/manager responsibilities, pre-implementation
+  assumptions, tradeoffs, blast radius, compatibility, observability and ownership.
+- [x] Expanded security lifecycle, bounded recovery, service objectives, rollout,
+  schema migration, restore/failover and operational ownership guidance.
+- [x] Fixed the guidance and offline test findings below; preserved HTTP example code,
+  result types, dependency locks, workflows and existing protected CI check names.
+- [x] Added 23 prompt/rubric pairs (18 positive, 5 negative); total 100, with 22 negative.
+- [x] Updated source/applicability mappings, assessment template, adapter metadata,
+  README, changelog, maintenance guide and public-path/count checks.
+- [x] Forward-tested nine distinct design scenarios with fresh isolated subagents;
+  clarified one partial restore response and rechecked it in a new conversation.
+- [x] Independent read-only review found no substantive guidance or compatibility
+  defect; resolved its missing-ledger observation and corrected an evaluation wording
+  overclaim to distinguish instructed directory scope from enforced access isolation.
+
+## Findings and disposition
+
+Severity below describes the potential consequence of following guidance, not a claim
+that the skill repository or a production application contains that runtime defect.
+
+| ID / severity | Location and trigger | Impact and evidence | Status |
+|---|---|---|---|
+| DD-01 / High | Failure taxonomy, capacity checklist and test catalogue: drop work on deadline/TTL/lease expiry | A payment can be committed or unknown after an attempt expires; source text did not preserve the business obligation | Fixed across core/taxonomy/checklists/rollout; sampled cases 85 and 92 preserve identity and reconcile |
+| DD-02 / High | Idempotency checklist: reservation/key expiry with uncertain external effect | Expiry could be read as permission to admit a new effect | Explicitly forbid fresh effects until noncommit or repeat safety is established; no application runtime claim |
+| DD-03 / Medium | Authorization checklist: apply user authorization unchanged to every replay/recovery | Revoked delegation and an accepted service obligation need different execution policy | Preserved authority invariants with scoped operation-specific policy; case 86 passed |
+| DD-04 / Low | Concurrency/shutdown wording: lock timeout prevents deadlock; readiness immediately stops traffic | Timeout only bounds waiting; existing connections and routing propagation can continue | Corrected mechanisms and recovery expectations |
+| DD-05 / Medium | `tests/test_fuzz_boundaries.py`, URL-only property test, inherited SOCKS proxy | Baseline ran 72 tests with one ImportError before URL assertions because optional socksio was absent | Reproduced before fix; set `trust_env=False` only on the no-I/O test client; all 72 now pass |
+| DD-06 / Low | README CI range ended at 3.14 while existing workflow includes 3.15 | Documented supported matrix differed from configuration | Updated README range; workflow unchanged |
+| DD-07 / Medium | Sample restore response omitted secondary recovery gates | Payment reconciliation alone did not state authority/privacy, keys/config and capacity checks | Replaced the restore preflight paragraph with an explicit applicability matrix; same scenario passed fresh recheck |
+
+Architecture choice, API/event evolution, OAuth/session lifecycle, build trust and
+operations ownership were coverage gaps, not demonstrated application vulnerabilities.
+Their new decision tables remain proportional and do not mandate a particular stack.
+
+## Verification evidence
+
+Environment: Python 3.12.14 in an isolated venv installed with
+`python -m pip install --require-hashes -r requirements-dev.txt`; `python -m pip check`
+passed. The commands below used that venv. Results are newly executed for 1.5.0, not
+reused from historical records.
+
+| Command | Result | Scope / limitation |
+|---|---|---|
+| `python scripts/validate_skill.py` | verified, passed | Metadata, 16 KiB budget, local links/reachability, adapter and 100-case corpus structure |
+| `python scripts/verify_reference.py` | verified, 60 passed | Deterministic illustrative HTTP reference behavior |
+| `python -m unittest discover -s tests -v` | verified, 72 passed | Validator, public surface, seeded properties and deadline regressions |
+| `python scripts/mutation_check.py` | verified, 17/17 killed | Existing targeted reference controls; not model behavior |
+| `python -m ruff check scripts skills tests` | verified, passed | Repository Python lint |
+| `python -m mypy scripts tests` | verified, passed | 8 source files |
+| `python -m mypy --strict skills/defensive-design/references` | verified, passed | 1 illustrative Python source file |
+| `python -m compileall -q scripts skills tests` | verified, passed | Python compilation |
+| `git diff --check` | verified, passed | Patch whitespace |
+| Bundled skill-creator `quick_validate.py` on baseline and revision | verified, both reject `compatibility` | Helper schema omits this existing optional field; the current Agent Skills specification allows it and the repository validator passes. Preserved valid metadata rather than weakening it for an older helper. |
+| `timeout 120s python -u -m scripts.check_links` | blocked, exit 124 | Complete external URL sweep exceeded the bounded execution window without a summary; no complete reachability pass is claimed |
+
+The final package content digest is
+`65c393ca32d123c30b637ce153b60d88f38f67774352738274997ad3168bec6a` (SHA-256 of
+sorted relative file path, NUL, raw file content, NUL; generated `__pycache__` excluded).
+The host interface was generated with the skill-creator helper and the existing
+implicit-invocation policy retained. Source-ledger additions were completed after the
+initial behavior sample; the only later behavioral change was the restore gate matrix,
+which received the fresh case-92 recheck.
+
+Behavior sample: ChatGPT Work / GPT-6 Astra Pro, exact build not exposed; three fresh
+agents answered three raw scenarios each from an isolated skill copy. Initial result:
+8 full matches and 1 partial (case 92). After clarifying restore gates, a fourth fresh
+agent answered the same raw case and matched the rubric. Nine distinct cases, ten
+responses, author-graded; no no-skill baseline or trigger measurement. The
+[evaluation record](../evals/README.md) lists cases and observable outcomes.
+
+## Remaining verification boundaries
+
+- `reasoned_not_run`: the complete 100-case corpus, negative trigger accuracy,
+  cross-host/model generalization and implementation-mode application fixtures.
+- Local execution used Python 3.12.14; other matrix versions and dependency canaries
+  require their own hosted execution evidence. A workflow definition is not a pass.
+- Primary sources were read through web retrieval; external reachability checks are
+  separate from factual review and local-link validation.
+- No application integration/load/production test, installation, deployment, tag or
+  release occurred. No claim of certification or exhaustive architecture coverage.
+- Historical CodeQL/harness/tag decisions remain historical backlog; this change
+  neither resolves them nor treats them as prerequisites for using the Markdown skill.
+
+## Historical 1.4.0 record (not current instructions, status or evidence)
+
+The following original record is preserved for traceability. Its authorization,
+uncommitted-work statements, counts and verification dates describe that earlier work.
+
+### Defensive Design 1.4.0 work ledger (unreleased)
 
 ## Scope
 

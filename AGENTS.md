@@ -10,6 +10,9 @@ Only `skills/defensive-design/` is installed; installers copy that whole directo
 
 - `skills/defensive-design/SKILL.md`: trigger, workflow, invariants, routing, version.
 - `skills/defensive-design/references/`: on-demand reasoning adapters and the HTTP example.
+  `architecture-decisions.md` owns selection and boundaries; `interface-contracts.md`
+  owns API/event/data/client contracts; `verification-and-chaos.md` owns rollout and
+  recovery evidence. Keep their scopes complementary and route each from the core.
 - `skills/defensive-design/assets/`: optional assessment template.
 - `skills/defensive-design/agents/`: optional host adapter; the core must not depend on it.
 - `skills/defensive-design/LICENSE`: identical copy of the root LICENSE.
@@ -62,3 +65,8 @@ final state, not only an earlier commit. Static package validation, HTTP example
 model behavior evaluations, integration tests and production guarantees are distinct.
 Report exact commands and scope with verified, reasoned_not_run, blocked or
 not_applicable. Do not fabricate model evaluations or reuse historical pass claims.
+
+For new architecture/security/operations guidance, pair an applicable positive case with
+negative or counterexample coverage: justified isolation must remain possible, and
+routine conceptual/formatting work must stay small. An expired execution attempt must
+never imply erasing a durable obligation or treating an unknown external effect as absent.

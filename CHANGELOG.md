@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.5.0 - unreleased
+
+### Added
+
+- Explicit Senior Software Architect, Staff Engineer and Engineering Manager operating
+  responsibilities and pre-implementation assumptions, tradeoffs, blast radius,
+  compatibility, ownership and verification decisions.
+- `references/architecture-decisions.md`: measurable quality scenarios, three independent
+  design axes, eleven conditional choices, enforced boundaries, data/consistency choices,
+  incremental evolution and concise architecture decision records.
+- `references/interface-contracts.md`: API/event/data contracts, asynchronous operation
+  status, old/new schema compatibility, cache refill races and web/mobile/offline recovery.
+- Security lifecycle guidance for OAuth/browser/native clients, scoped background-job
+  authority, SSRF egress, key rotation, restored deletion state and trusted artifact promotion.
+- Operational ownership, user-outcome SLIs/SLOs, capacity/cost evidence, representative
+  canaries, bounded expand/backfill/contract migrations and measured restore/failover gates.
+- 23 paired prompt/rubric cases: 18 positive and 5 negative. Corpus total: 100 cases,
+  78 positive and 22 negative. Corpus structure is separate from behavioral evidence.
+- Current primary-source mappings with applicability limits; expanded optional assessment
+  template and host adapter metadata. Preserved the core's 16 KiB budget.
+
+### Corrected
+
+- Expired attempts, lease loss and retry exhaustion must not delete durable obligations
+  or treat unknown external effects as uncommitted. Key expiry cannot authorize a new effect.
+- Scope automatic transport retry ownership per dependency operation; compose separately
+  bounded transaction recovery and durable redelivery. Make capped exponential jitter explicit.
+- Distinguish bounded lock waits from deadlock prevention, and readiness withdrawal from
+  immediate traffic cessation. Preserve authority invariants with operation-specific
+  execution semantics instead of requiring an unchanged user login for every recovery job.
+- The offline URL-construction property test no longer inherits host proxy/CA settings.
+  Baseline reproduced an ImportError from an environment SOCKS proxy before URL checks;
+  disabling environment configuration only in this no-I/O test removes that coupling.
+- README CI range now reflects the existing Python 3.11–3.15 workflow matrix.
+
+### Compatibility and evidence
+
+No existing package path, skill name, install command or HTTP example result type is
+removed. The HTTP example, dependency locks, workflows and protected check names are
+unchanged. No application migration is introduced. The trigger description now names
+production readiness and architecture tradeoffs; trigger accuracy requires evaluation.
+See the current work ledger and evaluation record for executed checks and limitations.
+No tag, release, installation, merge or deployment is implied by this package version.
+
 ## 1.4.0 - unreleased
 
 ### Added (skill guidance)
