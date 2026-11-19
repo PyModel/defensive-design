@@ -1,0 +1,6 @@
+{
+  "format": "captured-utf8-text-v1",
+  "original_name": "commands.json",
+  "sha256": "943e7df934fcd206de85573cc82f167d5b91e7e1487b67e3ce2ba1a3cf7607ce",
+  "text": "[\n  {\n    \"cmd\": \"cat /workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-baseline/executor-prompt.txt\",\n    \"workdir\": \"/workspace/scratch/abe4f6ddfcc2\",\n    \"exit_status\": 0,\n    \"runs\": 2\n  },\n  {\n    \"cmd\": \"cat /workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-baseline/task.md\",\n    \"workdir\": \"/workspace/scratch/abe4f6ddfcc2\",\n    \"exit_status\": 0,\n    \"runs\": 2\n  },\n  {\n    \"cmd\": \"rg --files\",\n    \"workdir\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-baseline/workspace\",\n    \"exit_status\": 0,\n    \"runs\": 2\n  },\n  {\n    \"cmd\": \"cat payment.py\",\n    \"workdir\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-baseline/workspace\",\n    \"exit_status\": 0,\n    \"runs\": 2\n  },\n  {\n    \"cmd\": \"python -m unittest -v test_payment\",\n    \"workdir\": \"/workspace/scratch/abe4f6ddfcc2/defensive-eval-work/fixture-payment-baseline/workspace\",\n    \"exit_status\": 0,\n    \"runs\": 1\n  }\n]\n\n"
+}

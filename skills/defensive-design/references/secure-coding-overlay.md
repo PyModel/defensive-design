@@ -55,6 +55,17 @@ canonical value, then use the safe API required by the destination.
 | Parser or deserializer | Use data-only formats and safe modes; bound bytes, nesting, objects, expansion, and time; never instantiate arbitrary types from input |
 | Browser, model, or agent tool | Treat content as data, not authority; revalidate schema and permission at execution; bind approval to exact resolved arguments |
 
+For ImageMagick processing untrusted uploads, name the installed policy controls:
+disable external delegates and loadable filters, deny unnecessary coders/modules,
+and allow only required formats. Block indirect `@file` reads and unneeded network
+or filesystem access. Verify the active policy and rule ordering against the installed
+version (for example, `magick identify -list policy` on supported releases); merely
+writing a policy file proves nothing. Bound dimensions, frames, memory, disk and time.
+If a required format needs a delegate, authorize that narrow capability inside an
+isolated worker, rather than enabling all delegates. Use benign fixtures to verify
+that denied conversions cause no child execution, outbound fetch or path escape.
+See the [official policy guide](https://imagemagick.org/security-policy/).
+
 Allowlists must constrain semantics, not merely match a convenient string shape.
 Reject ambiguous encodings, duplicate fields, invalid Unicode, and normalization changes
 when they could alter identity, paths, signatures, cache keys, or policy decisions.

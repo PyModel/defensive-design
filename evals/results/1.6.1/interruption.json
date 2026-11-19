@@ -1,0 +1,19 @@
+{
+  "reason": "Host wait reported aborted by user; agent inventory then contained only root. No textual change to task scope was received.",
+  "completed_arms": [
+    "baseline-01",
+    "baseline-02",
+    "baseline-03",
+    "baseline-04",
+    "skill-01",
+    "skill-02"
+  ],
+  "restarted_design_batches": [
+    "skill-03",
+    "skill-04"
+  ],
+  "partial_answers_preserved": "interrupted-attempts/skill-04-partial.jsonl",
+  "partial_fixture_preserved": "interrupted-attempts/fixture-payment-skill-workspace",
+  "scoring": "Only completed design responses enter the primary corpus report. Interrupted attempts are explicitly retained and not counted as passes.",
+  "fixture_restart": "Payment skill workspace reset to the original starter after preserving partial work; the replacement executor receives no previous solution or grader outcome."
+}

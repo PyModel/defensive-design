@@ -1,0 +1,23 @@
+{
+  "candidate_package_sha256": "f2ac42b1bd652d43c3f4cdc75c168a4ef909749bd821ceae2a12842c7f4b5509",
+  "release_package_sha256": "f2ac42b1bd652d43c3f4cdc75c168a4ef909749bd821ceae2a12842c7f4b5509",
+  "difference": "None: the final fresh check uses the exact 1.6.1 package. The earlier 7/8 refinement check retains its separate 1.6.0 snapshot and original grades.",
+  "changed_paths": [],
+  "release_files": {
+    "LICENSE": "c5715a1364411c536909d574fae96f19e9decfda5dfa0fa3927df06aa1137aea",
+    "SKILL.md": "616d832589e1ac28f7ce7047dd1b04aa410e2da0eb652ea14ed1aaa004e55567",
+    "agents/openai.yaml": "34e7fd3655a82b0f4165dc4b65eb323189d6f88ce7a295a51302d00499323f92",
+    "assets/assessment-template.md": "d8d37dceca533beae614732729feef3cfe348e23d5f98c7b4057e73bf56bad68",
+    "references/architecture-adaptation.md": "cd37fc32adef9dce1701cfcc73441f80ee20e1db0e0f6ecc95aa7b906183d0f0",
+    "references/architecture-decisions.md": "e0733f2ee6d3a79cf3c34cc09e0135ccc2275da572674cdfb9a786fb7d33e4e1",
+    "references/code-level-design.md": "5ba4b8f96115432ef67e5cb2e32c4b5fd02ddb56a5a04f34268965051f6b2879",
+    "references/defensive-checklists.md": "965f0300b3ad36ebf9fd0a9795f4cd0bfa26d18200b1382b2c2a0d64ffd4e44a",
+    "references/failure-taxonomy.md": "839cc280a188532b307c18f02dc6c0a66634e3666a4a8b938f70291de93e3f41",
+    "references/interface-contracts.md": "b51825385063f984648ae464e08a7b18ee414267552eb976e447384c8593b100",
+    "references/resilient_http_example.py": "7e5a0589634deac794b6feeb3136fb0e1a994023562b14e87635b0a96044b426",
+    "references/secure-coding-overlay.md": "a85439199bab0812e07ee37482bd8eb1a259f8a28779ed7135e63babb97dc054",
+    "references/sources.md": "2458219c7635a3efd804e991ee16b13e79aa07d6b60dd4005f65b79e46af6cc5",
+    "references/verification-and-chaos.md": "4746459808f02b825ac6df385c3deaad4cf780bed9026b4bb5bfecdfeaf708c3"
+  },
+  "verified": true
+}

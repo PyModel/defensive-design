@@ -64,6 +64,17 @@ jobs:
         if: matrix.python-version == '3.11'
         run: python scripts/mutation_check.py
 
+      - name: Validate archived evaluation evidence (no model execution)
+        if: matrix.python-version == '3.11'
+        run: |
+          python scripts/evaluate_skill.py report \
+            --run evals/results/1.6.1/snapshot \
+            --responses evals/results/1.6.1/responses.jsonl \
+            --triggers evals/results/1.6.1/triggers.jsonl \
+            --grades evals/results/1.6.1/grades.jsonl \
+            --out "$RUNNER_TEMP/behavior-evidence.json"
+          cmp evals/results/1.6.1/summary.json "$RUNNER_TEMP/behavior-evidence.json"
+
       - name: Archive the checked source and environment
         if: matrix.python-version == '3.11'
         shell: bash

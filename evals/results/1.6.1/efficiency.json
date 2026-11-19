@@ -1,0 +1,124 @@
+{
+  "tool": "tiktoken",
+  "version": "0.12.0",
+  "notes": "Exact counts for declared public encodings, not exact host/model context or runtime token accounting. Core includes frontmatter. Package has no tokenizer dependency.",
+  "core": {
+    "1.5.0": {
+      "bytes": 16097,
+      "words": 2121,
+      "lines": 236,
+      "tokens": {
+        "o200k_base": 3156,
+        "cl100k_base": 3178
+      }
+    },
+    "1.6.0-initial": {
+      "bytes": 11947,
+      "words": 1385,
+      "lines": 189,
+      "tokens": {
+        "o200k_base": 2346,
+        "cl100k_base": 2358
+      }
+    },
+    "1.6.0-first-refinement": {
+      "bytes": 12001,
+      "words": 1395,
+      "lines": 190,
+      "tokens": {
+        "o200k_base": 2357,
+        "cl100k_base": 2370
+      }
+    },
+    "1.6.1": {
+      "bytes": 12093,
+      "words": 1403,
+      "lines": 191,
+      "tokens": {
+        "o200k_base": 2375,
+        "cl100k_base": 2388
+      }
+    }
+  },
+  "package_files": {
+    "SKILL.md": {
+      "bytes": 12093,
+      "tokens": {
+        "o200k_base": 2375,
+        "cl100k_base": 2388
+      }
+    },
+    "assets/assessment-template.md": {
+      "bytes": 3653,
+      "tokens": {
+        "o200k_base": 714,
+        "cl100k_base": 716
+      }
+    },
+    "references/architecture-adaptation.md": {
+      "bytes": 9072,
+      "tokens": {
+        "o200k_base": 1658,
+        "cl100k_base": 1665
+      }
+    },
+    "references/architecture-decisions.md": {
+      "bytes": 16294,
+      "tokens": {
+        "o200k_base": 3040,
+        "cl100k_base": 3046
+      }
+    },
+    "references/code-level-design.md": {
+      "bytes": 11603,
+      "tokens": {
+        "o200k_base": 2490,
+        "cl100k_base": 2477
+      }
+    },
+    "references/defensive-checklists.md": {
+      "bytes": 23246,
+      "tokens": {
+        "o200k_base": 4697,
+        "cl100k_base": 4708
+      }
+    },
+    "references/failure-taxonomy.md": {
+      "bytes": 9485,
+      "tokens": {
+        "o200k_base": 1969,
+        "cl100k_base": 1973
+      }
+    },
+    "references/interface-contracts.md": {
+      "bytes": 10043,
+      "tokens": {
+        "o200k_base": 1919,
+        "cl100k_base": 1919
+      }
+    },
+    "references/secure-coding-overlay.md": {
+      "bytes": 18503,
+      "tokens": {
+        "o200k_base": 3698,
+        "cl100k_base": 3695
+      }
+    },
+    "references/sources.md": {
+      "bytes": 14786,
+      "tokens": {
+        "o200k_base": 3180,
+        "cl100k_base": 3170
+      }
+    },
+    "references/verification-and-chaos.md": {
+      "bytes": 21851,
+      "tokens": {
+        "o200k_base": 4183,
+        "cl100k_base": 4203
+      }
+    }
+  },
+  "refined_candidate_package_sha256": "5708c9c0b799676af83e180c382c338c1a24378c1b2f3363916ae0be658c4db6",
+  "release_package_sha256": "f2ac42b1bd652d43c3f4cdc75c168a4ef909749bd821ceae2a12842c7f4b5509"
+}

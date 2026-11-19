@@ -134,10 +134,16 @@ class ExportTests(unittest.TestCase):
 
     def test_read_and_cleanup_failures_preserve_primary_error(self):
         primary = OSError("read failed")
-        storage = Storage(Stream(read_error=primary, close_error=RuntimeError("cleanup failed")))
+        cleanup = RuntimeError("cleanup failed")
+        storage = Storage(Stream(read_error=primary, close_error=cleanup))
         with self.assertRaises(OSError) as caught:
             self.invoke(Authz([True, True]), storage)
         self.assertIs(caught.exception, primary)
+        self.assertTrue(
+            caught.exception.__cause__ is cleanup or caught.exception.__context__ is cleanup
+            or getattr(caught.exception, "__notes__", None),
+            "secondary cleanup failure must remain observable",
+        )
         self.assertTrue(storage.stream.close_called)
         self.assertEqual(storage.publish_calls, [])
 

@@ -48,6 +48,9 @@ class PublicSurfaceTests(unittest.TestCase):
         missing = sorted(path for path in PUBLIC_PATHS if not (PACKAGE / path).is_file())
         self.assertEqual(missing, [])
 
+    def test_repository_contains_only_one_discoverable_skill(self) -> None:
+        self.assertEqual(set(PACKAGE.parents[1].rglob("SKILL.md")), {PACKAGE / "SKILL.md"})
+
     def test_example_result_types_are_preserved(self) -> None:
         actual = {member.name: member.value for member in harness.mod.FetchStatus}
         self.assertEqual({name: actual.get(name) for name in FETCH_STATUS}, FETCH_STATUS)

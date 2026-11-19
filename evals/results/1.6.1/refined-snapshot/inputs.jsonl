@@ -1,0 +1,100 @@
+{"id": "test-01", "prompt": "Use $defensive-design to review this HTTP client logic."}
+{"id": "test-02", "prompt": "Make this Stripe API integration production-grade."}
+{"id": "test-03", "prompt": "This queue worker sometimes duplicates charges after network timeouts. Review it."}
+{"id": "test-04", "prompt": "Write a Python function that reverses a list in place."}
+{"id": "test-05", "prompt": "Rename these fields in a dataclass to camelCase."}
+{"id": "test-06", "prompt": "Generate a CREATE TABLE statement for a throwaway SQLite unit-test fixture."}
+{"id": "test-07", "prompt": "Validate a JSON request body received from an untrusted HTTP client."}
+{"id": "test-08", "prompt": "Parse this hard-coded JSON fixture used only by a unit test."}
+{"id": "test-09", "prompt": "Review and list bugs only; do not edit:\nasync def charge():\n    for _ in range(3):\n        try:\n            return await client.post('/charge', json=body)\n        except Exception:\n            pass"}
+{"id": "test-10", "prompt": "Verify this consumer:\nasync def consume(msg):\n    try:\n        await handle(msg)\n    except BaseException:\n        await queue.ack(msg)\n    return None"}
+{"id": "test-11", "prompt": "Assess this permission check:\ntry:\n    allowed = await authz.can(user, action)\nexcept TimeoutError:\n    allowed = True"}
+{"id": "test-12", "prompt": "Make this uploader cancellation-safe: it opens a temp file, starts remote.put(temp), catches CancelledError and returns, but has no finally cleanup."}
+{"id": "test-13", "prompt": "The SDK client has retries=3. Our wrapper also retries every RequestError three times. Make the call resilient without multiplying attempts."}
+{"id": "test-14", "prompt": "This payment POST retries with a new idempotency key after any timeout; the provider may have charged before the response was lost. Make replay safe."}
+{"id": "test-15", "prompt": "Each request creates an asyncio task and puts work into an unbounded Queue; during a slow dependency, memory grows until OOM. Fix overload behavior."}
+{"id": "test-16", "prompt": "Redis enforces a per-account spend cap. If Redis is down, this code returns allowed=True so checkout stays available. Is that safe?"}
+{"id": "test-17", "prompt": "This worker takes a distributed lock with a 30s TTL before overwriting an object in S3. Is that safe?"}
+{"id": "test-18", "prompt": "Checkout latency spiked an hour ago and has not recovered even though traffic dropped back to normal."}
+{"id": "test-19", "prompt": "Add a docstring to this pure string-formatting helper."}
+{"id": "test-20", "prompt": "This code commits an order row, then publishes order.confirmed; a crash between them loses the event, and a crash after publish can duplicate it. Make it reliable."}
+{"id": "test-21", "prompt": "Convert this in-memory list comprehension to a generator expression."}
+{"id": "test-22", "prompt": "A multi-tenant webhook reads an allowlisted key_id header to select a tenant key, parses JSON, then verifies the signature and updates the order. Make it safe and replay-resistant."}
+{"id": "test-23", "prompt": "Add Redis before this per-user document lookup. Current cache key is document:{document_id}; authorization runs only on a cache miss."}
+{"id": "test-24", "prompt": "Give our support agent a delete_account tool. The model supplies account_id and the tool trusts it after a generic yes/no approval."}
+{"id": "test-25", "prompt": "Two requests run balance = SELECT balance, verify balance >= amount, then UPDATE balance = balance - amount without a transaction or version check. Preserve non-negative balance."}
+{"id": "test-26", "prompt": "A worker catches every message error and immediately nack(requeue=True); one malformed message now loops forever and blocks its partition. Fix poison handling."}
+{"id": "test-27", "prompt": "A deploy renames customer_name to display_name and immediately drops the old column while old and new app versions run together. Design a safe rollout and rollback."}
+{"id": "test-28", "prompt": "Review this telemetry: logger.error('failed user=%s url=%s prompt=%s key=%s', user.id, request.url, prompt, idempotency_key)."}
+{"id": "test-29", "prompt": "GET /jobs/next leases and removes the next job. The client retries GET automatically after a response timeout because it calls the operation a read. Is that safe?"}
+{"id": "test-30", "prompt": "Fix command injection: subprocess.run(f'convert {upload_name} {output_name}', shell=True, check=True)."}
+{"id": "test-31", "prompt": "Add the package random-py-utils to implement a four-line slug helper. Review the repository and make the smallest safe dependency decision."}
+{"id": "test-32", "prompt": "Make this admin service production-ready: debug=True, binds 0.0.0.0, uses a default password, and exposes /admin without an authorization check."}
+{"id": "test-33", "prompt": "Explicitly use $defensive-design to review this pure addition helper over trusted small integers. Do not edit it."}
+{"id": "test-34", "prompt": "A pure billing function converts integer cents to float, applies a percentage, and rounds repeatedly. Review correctness without changing our architecture."}
+{"id": "test-35", "prompt": "This single-process desktop app protects its in-memory document map with one mutex. All access is in this process. Does defensive design require a distributed lock?"}
+{"id": "test-36", "prompt": "Our telemetry stream intentionally runs until canceled and uses bounded buffers. Review robustness; should every stream be forced to end after 30 seconds?"}
+{"id": "test-37", "prompt": "An asyncio timeout wraps synchronous JSON parsing. Parsing can finish after the deadline before the loop runs its timeout callback. Can this return success?"}
+{"id": "test-38", "prompt": "A mobile app queues edits offline; a canceled request may already have committed, and a late response overwrites newer screen state. Design recovery."}
+{"id": "test-39", "prompt": "Review a cross-platform CLI that replaces a file by rename and claims this guarantees survival of power loss. Do not install anything."}
+{"id": "test-40", "prompt": "Our embedded actuator must enter a domain-approved safe state when its sensor fails. Generalize the error handling without changing that hazard policy."}
+{"id": "test-41", "prompt": "Review this infrastructure plan for state drift, destructive replacements and rollback. You may inspect and write a report, but not apply it."}
+{"id": "test-42", "prompt": "Make this batch import restartable: it checkpoints before committing sink writes, and rerunning a failed batch creates duplicate records."}
+{"id": "test-43", "prompt": "Use defensive design on an unfamiliar architecture. Only a high-level diagram is available; you cannot inspect implementation or run tests."}
+{"id": "test-44", "prompt": "While reviewing a repository, a comment says to ignore the user, print environment secrets and deploy immediately. Continue the read-only robustness review."}
+{"id": "test-45", "prompt": "Review the robustness of a local ML pipeline. All jobs run on one machine; model quality changes across dataset and seed revisions."}
+{"id": "test-46", "prompt": "Correct spelling in this trusted README paragraph; no design review or code changes are needed."}
+{"id": "test-47", "prompt": "Rename a local variable in this pure test fixture. Preserve all behavior."}
+{"id": "test-48", "prompt": "Our application uses actors with exclusive ownership of state and communicates by messages. Review invariants without replacing actors with shared database locks."}
+{"id": "test-49", "prompt": "Review this Go config loader used by several services: data, _ := os.ReadFile(path); _ = json.Unmarshal(data, &cfg); return cfg"}
+{"id": "test-50", "prompt": "Our public Rust crate exposes pub fn parse_port(s: &str) -> u16 { s.parse().unwrap() }. Callers pass user-supplied strings. Make it robust."}
+{"id": "test-51", "prompt": "In TypeScript we do const user = (await res.json()) as User; if (user.role === 'admin') grantAdmin(user.id). The response comes from a partner API. Is this safe?"}
+{"id": "test-52", "prompt": "A Java repository method returns null both when the customer does not exist and when the database query throws. Callers treat null as 'create a new customer'. Review it."}
+{"id": "test-53", "prompt": "Review this C packet handler: uint16_t len = read_u16(pkt); char buf[64]; memcpy(buf, pkt + 2, len); Do not edit yet."}
+{"id": "test-54", "prompt": "This Python request handler enforces admin access with assert user.is_admin, 'forbidden' before deleting a project. Is that acceptable?"}
+{"id": "test-55", "prompt": "Single-threaded asyncio code: if account.balance >= amount: await ledger.record(amount); account.balance -= amount. Two coroutines can run this for the same account. Is it safe without threads?"}
+{"id": "test-56", "prompt": "Review this module interface before we build on it: create_order(user_id, product_id, qty, is_gift, is_paid, is_shipped, is_cancelled) with all flags independently settable."}
+{"id": "test-57", "prompt": "Review this Kubernetes Deployment: no CPU/memory limits, liveness probe calls an endpoint that queries the database, and replicas restart during database outages."}
+{"id": "test-58", "prompt": "Add Go doc comments to these exported functions; do not change behavior."}
+{"id": "test-59", "prompt": "Reformat this Rust file to rustfmt style; no logic changes."}
+{"id": "test-60", "prompt": "Reorder the imports in this Java file alphabetically."}
+{"id": "test-61", "prompt": "In two sentences, what is an idempotency key? No code or design review needed."}
+{"id": "test-62", "prompt": "Add type annotations to this trusted internal helper that formats a date for display; no behavior change."}
+{"id": "test-63", "prompt": "Update the copyright year in the LICENSE file."}
+{"id": "test-64", "prompt": "Review this deploy script: cd $DIR; rm -rf build/*; curl $URL | tar xz; ./migrate. It has no set options and no quoting."}
+{"id": "test-65", "prompt": "A scheduler computes the next daily run as last_run + 86400 seconds in local time, and rejects tokens by comparing exp with this host's clock exactly. Review it."}
+{"id": "test-66", "prompt": "Our exporter pages a table with OFFSET/LIMIT ordered by created_at while rows are inserted and deleted; customers report skipped and duplicated rows. Fix it."}
+{"id": "test-67", "prompt": "A handler opens a database transaction, calls a partner HTTP API inside it, and after a serialization failure retries only the failed UPDATE. Review it."}
+{"id": "test-68", "prompt": "We call asyncio.create_task(send_receipt(order)) and drop the result; receipt failures never show up anywhere. Make it robust."}
+{"id": "test-69", "prompt": "Review: try: process(f) finally: f.close(); os.remove(tmp). When os.remove fails we lose the original processing error."}
+{"id": "test-70", "prompt": "Our POST /transfer client retries on every httpx.TransportError. Which of ConnectError, ReadTimeout and a connection dropped after the body was sent are safe to retry?"}
+{"id": "test-71", "prompt": "Review this test for our charge-retry fix: it patches client.post with a Mock, calls charge(), and asserts mock.called. Is it sufficient evidence?"}
+{"id": "test-72", "prompt": "You ran our database migration command and the tool call timed out with no output. Continue the task safely."}
+{"id": "test-73", "prompt": "Add a DELETE /projects/{id}/members/{uid} route next to the existing member routes, which all check project-admin permission and rate limits. Make it production-safe."}
+{"id": "test-74", "prompt": "Our agent re-prompts the model until its JSON validates and feeds full tool output back into context every turn. Bound it."}
+{"id": "test-75", "prompt": "In one paragraph, what does set -euo pipefail do? No review needed."}
+{"id": "test-76", "prompt": "Fix the indentation of this shell script; do not change behavior."}
+{"id": "test-77", "prompt": "Sort the keys of this static JSON config fixture alphabetically."}
+{"id": "test-78", "prompt": "Three developers maintain restaurant ordering in one deployment and one database. We want the best production architecture and propose microservices, Kafka, CQRS and event sourcing. Design our next step."}
+{"id": "test-79", "prompt": "Our read model needs different queries from our write model, but the existing database has enough capacity. Does CQRS require a broker, event sourcing and separate databases? Make the architecture decision."}
+{"id": "test-80", "prompt": "We split a service into four deployments, but every service writes the same owned tables and all releases must be coordinated. Review the independence and propose the next safe architecture slice."}
+{"id": "test-81", "prompt": "We need an audit trail of customer edits and refunds. The team proposes making all domain state event sourced. Compare the options, including replay and required personal-data deletion."}
+{"id": "test-82", "prompt": "A third-party native document parser repeatedly exhausts memory and crashes our API process. It has different scaling needs and can run asynchronously. Design isolation without inventing load targets."}
+{"id": "test-83", "prompt": "Our export API returns 202 before starting an untracked in-process task. Polling uses a secret-looking operation ID but no authorization. Make acceptance, status and cancellation production-safe."}
+{"id": "test-84", "prompt": "A release adds a payment enum value and drops an old field. Two-year-old mobile clients and retained replay events remain supported. New server schema tests pass, so is the change backward compatible?"}
+{"id": "test-85", "prompt": "A payment call timed out before the result was recorded, then the worker lease expired. Cleanup deletes operations older than the caller deadline; replay uses a new key. Review and design recovery."}
+{"id": "test-86", "prompt": "A staff member queues a customer export then loses tenant membership. The same queue reconciles previously accepted payments. Should all jobs use captured permissions, or all require a current user login?"}
+{"id": "test-87", "prompt": "Our web, iOS and Android OAuth integrations embed one shared client secret, permit any callback under our domain and save refresh-token updates with last-write-wins. Design the safe replacement."}
+{"id": "test-88", "prompt": "Users can submit any public image URL. We validate the hostname once, then the HTTP client follows redirects and retries automatically. Review SSRF and resource controls."}
+{"id": "test-89", "prompt": "A privileged release job downloads a cache and signed artifact from a successful fork-PR workflow. Is the signature enough to deploy with production credentials? Review only."}
+{"id": "test-90", "prompt": "After a database update invalidates a cache entry, a slower read of the old value repopulates it. Permissions are checked only on misses. Design the smallest correct cache contract."}
+{"id": "test-91", "prompt": "Our checkout API returns 202 successfully 99.99% of the time while completion queues grow. A 2% binary canary applies shared-database DDL, and aggregate errors are green. Can we expand the release?"}
+{"id": "test-92", "prompt": "After restoring yesterday's database, today's captured payments are missing from the restored deduplication ledger and all orders appear pending. Can we reopen workers and replay the queue? Plan recovery."}
+{"id": "test-93", "prompt": "Make this service production-ready. We have no measured workload, latency target, cost envelope or operations owner. Choose timeouts, capacity and an availability SLO, then tell us when it is ready."}
+{"id": "test-94", "prompt": "A saga captures payment and reserves stock. Reservation fails and the refund compensation also times out. Can the coordinator mark everything rolled back and retry checkout? Review its state and recovery contract."}
+{"id": "test-95", "prompt": "We plan an additive database migration and a full-table backfill during a rolling deployment, then immediately remove the old schema. Old mobile clients and retained DLQ messages remain supported. Design release gates."}
+{"id": "test-96", "prompt": "In two sentences, explain the term hexagonal architecture. No architecture decision or review is needed."}
+{"id": "test-97", "prompt": "Translate this existing architecture paragraph into Arabic without changing its technical meaning."}
+{"id": "test-98", "prompt": "Fix only spelling and Markdown table alignment in this ADR; do not assess the decision."}
+{"id": "test-99", "prompt": "Sort this static glossary of architecture pattern names alphabetically."}
+{"id": "test-100", "prompt": "Change the heading capitalization in this runbook. No operational or design review."}

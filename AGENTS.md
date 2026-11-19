@@ -22,6 +22,8 @@ Only `skills/defensive-design/` is installed; installers copy that whole directo
   before independent grading. `scripts/evaluate_skill.py` validates exact snapshot hashes,
   complete IDs and evidence quotations; it does not judge correctness by keywords.
   Archived results describe their snapshot, model, batching and isolation limits.
+  Store archived package bytes in `package.json`, not another discoverable `SKILL.md`;
+  the repository must contain exactly one installable skill entrypoint.
 - `scripts/`, `tests/`, `pyproject.toml`, `requirements-dev.*`, `requirements-audit.*`: maintainer checks.
 - `tasks/todo.md`: current work evidence and clearly separated historical records.
 

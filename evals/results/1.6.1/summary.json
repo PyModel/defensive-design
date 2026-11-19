@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "context": {
+    "host": "ChatGPT Work via collaboration subagents",
+    "model": "GPT-6 Astra Pro; exact build identifier not exposed",
+    "system_instructions": "Fresh no-parent-history agents use host system/developer instructions. Executor prompt and per-case raw user inputs are captured. No expected answer/rubric supplied to executors. Baseline receives no skill instructions. Trigger classifier receives frontmatter metadata only. Graders are fresh agents, separate from executors.",
+    "tools": [
+      "exec_command for reading specified inputs/skill and writing outputs",
+      "apply_patch for fixture code changes; no network or production operations"
+    ],
+    "permissions": "Instructional path scoping in a shared filesystem, not an enforced security boundary. Design answers do not execute user systems. Fixtures use disposable local directories and no credentials.",
+    "date": "2026-11-18",
+    "fixture_revision": "1.6.0 fixtures recorded by exact file SHA-256 in fixture results",
+    "notes": "Full corpus: four fresh conversations of 25 cases per arm; cases within a batch share conversation and are not independent. One metadata-only trigger classification pass. Independent grading with exact evidence excerpts; no cross-model or universal performance claim. Per-case answer lengths may differ. Model runtime token usage is not exposed."
+  },
+  "package_sha256": "0be52684d55e382887b63f5604e3d3c74f89dba9f71af570d45b47825a677c74",
+  "corpus_sha256": "c8b0b98eda5980f3de3bba17e733bcb86249ebdf5b6dbfb4be4ab6d40079d2e9",
+  "rubric_sha256": "96ccf0157c6cf98957d5936dc7dbf8cc2a2a0ad2e69998af6bfc6571d655e66e",
+  "evidence_sha256": {
+    "responses": "48c5718bdabbe916202c030bcc3fe4a4199f4c2b699c5a4dc13ad01fc7a4df4b",
+    "triggers": "55e39f44619e8d123f97df370b06a2a2fb82d9a37c7d6bd2090950a9822b8469",
+    "grades": "79e2f24da3c8b3f8b1d9297100c1567d27203cd94916cb5fa8ec646dfc5466ab"
+  },
+  "trigger": {
+    "total": 100,
+    "true_positive": 78,
+    "false_positive": 0,
+    "true_negative": 22,
+    "false_negative": 0,
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "behavior": {
+    "baseline": {
+      "total": 100,
+      "pass": 87,
+      "fail": 13,
+      "blocked": 0,
+      "pass_rate": 0.87,
+      "critical_failures": 0
+    },
+    "skill": {
+      "total": 100,
+      "pass": 97,
+      "fail": 3,
+      "blocked": 0,
+      "pass_rate": 0.97,
+      "critical_failures": 0
+    }
+  },
+  "paired": {
+    "both_pass": 86,
+    "skill_only_pass": 11,
+    "baseline_only_pass": 1,
+    "neither_pass": 2
+  },
+  "core": {
+    "bytes": 11947,
+    "words": 1385,
+    "token_count": null,
+    "token_note": "Byte and whitespace-word counts are not model token counts."
+  },
+  "interpretation": "Counts aggregate supplied judgments, not an automated proof of answer quality. Blocked cases remain in the denominator. Exact quotes establish traceability, not correctness or grader independence. Context records host and isolation limitations."
+}
