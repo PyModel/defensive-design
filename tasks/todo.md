@@ -51,6 +51,7 @@ universal superiority; no broader performance claim is implied.
 |---|---|---|---|
 | DD-08 | HTTP retry enters pool acquisition after most of operation budget is spent | Before fix, configured pool wait was 0.2 s while less than 0.1 s remained; operation expired and local saturation could be charged to upstream breaker | Fixed: remaining-budget cap, no-I/O expiry guard, executable regressions and mutant |
 | DD-09 | Serial external link checker encounters slow DNS/network | Prior 120 s invocation produced no complete report; urllib timeout did not cover whole-run/DNS behavior | Fixed: process isolation and bounded sweep, full classifications preserved |
+| DD-11 | New pool regression mixed a fake clock jump with a real sleep | First hosted latest-HTTPX canary expired under runner scheduling while other jobs passed | Fixed test to advance the controlled monotonic clock by the transport wait; removed wall-clock dependence without weakening guard/outcome assertions |
 | DD-10 | 100 authored cases were treated only as a structure-valid corpus | No complete trigger/behavior/baseline evidence or implementation fixture existed | Harness and fixtures implemented; full experiment evidence recorded below when executed |
 
 ## Historical 1.5.0 record (not current instructions, status or evidence)

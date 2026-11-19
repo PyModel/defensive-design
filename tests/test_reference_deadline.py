@@ -70,8 +70,7 @@ class DeadlineCompletionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_retry_pool_wait_is_bounded_by_remaining_operation_budget(self):
         loop = asyncio.get_running_loop()
-        real_time = loop.time
-        elapsed = [0.0]
+        clock = [loop.time()]
         calls = []
         breaker = harness.mod.AsyncCircuitBreaker(failure_threshold=5, reset_timeout_s=10.0)
 
@@ -80,15 +79,17 @@ class DeadlineCompletionTests(unittest.IsolatedAsyncioTestCase):
                 calls.append(request.extensions["timeout"]["pool"])
                 if len(calls) == 1:
                     return httpx.Response(503)
-                await asyncio.sleep(request.extensions["timeout"]["pool"])
+                # Model the saturated pool consuming its configured wait without
+                # depending on hosted-runner scheduling or wall-clock sleeps.
+                clock[0] += request.extensions["timeout"]["pool"]
                 raise httpx.PoolTimeout("pool exhausted", request=request)
 
         async def advance_backoff(_delay):
             # Leave less than the configured pool timeout for the next attempt.
-            elapsed[0] += 0.9
+            clock[0] += 0.9
 
         config = harness.cfg(deadline_s=1.0, per_attempt_timeout_s=0.4)
-        with patch.object(loop, "time", side_effect=lambda: real_time() + elapsed[0]):
+        with patch.object(loop, "time", side_effect=lambda: clock[0]):
             async with httpx.AsyncClient(
                 base_url="https://example.test", transport=RetryThenSaturatedPool(), trust_env=False
             ) as client:
